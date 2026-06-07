@@ -92,7 +92,7 @@
   .cell .box{position:relative; width:100%; aspect-ratio:1/1; border-radius:4px; overflow:hidden; background:#fbf8f0; cursor:crosshair; touch-action:none;}
   .cell .box svg, .cell .box .ref, .cell canvas{position:absolute; inset:0; width:100%; height:100%;}
   .cell .ref{display:grid; place-items:center; font-size:74px; color:var(--ink); pointer-events:none; opacity:0; line-height:1;}
-  .cell canvas{z-index:2;}
+  .cell canvas{z-index:2; touch-action:none; -webkit-user-select:none; user-select:none;}
   .cell .cap{display:flex; align-items:center; justify-content:space-between; margin-top:6px; gap:6px;}
   .cell .uni{font-family:var(--mono); font-size:9.5px; color:var(--ink-soft); line-height:1.25;}
   .cell .uni b{color:var(--cinnabar); font-weight:600;}
@@ -397,22 +397,52 @@
     }
     requestAnimationFrame(resize);
     cv._resize=resize;
-    let drawing=false, pts=[];
-    const pos=e=>{ const r=cv.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return [t.clientX-r.left, t.clientY-r.top]; };
-    function setStyle(ctx){ ctx.globalCompositeOperation=eraser?'destination-out':'source-over'; ctx.strokeStyle='#000000'; ctx.lineWidth=eraser?pen*3:pen; }
-    function down(e){ e.preventDefault(); drawing=true; const ctx=cv._ctx; pts=[pos(e)]; setStyle(ctx);
-      ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); ctx.lineTo(pts[0][0]+.1,pts[0][1]+.1); ctx.stroke(); }
-    function move(e){ if(!drawing)return; e.preventDefault(); const ctx=cv._ctx; pts.push(pos(e)); setStyle(ctx);
-      const n=pts.length;
-      if(n<3){ ctx.beginPath(); ctx.moveTo(pts[n-2][0],pts[n-2][1]); ctx.lineTo(pts[n-1][0],pts[n-1][1]); ctx.stroke(); return; }
-      // quadratic smoothing: curve through midpoints, control = actual point
-      const p0=pts[n-3], p1=pts[n-2], p2=pts[n-1];
-      const m1=[(p0[0]+p1[0])/2,(p0[1]+p1[1])/2], m2=[(p1[0]+p2[0])/2,(p1[1]+p2[1])/2];
-      ctx.beginPath(); ctx.moveTo(m1[0],m1[1]); ctx.quadraticCurveTo(p1[0],p1[1],m2[0],m2[1]); ctx.stroke(); }
-    function up(){ if(!drawing)return; drawing=false; try{ store[key]=cv.toDataURL('image/png'); cell.classList.add('filled');
-      if(key.indexOf('syl-')===0) extractFromSyllable(+key.slice(4)); }catch(e){} }
-    cv.addEventListener('pointerdown',down); cv.addEventListener('pointermove',move);
-    window.addEventListener('pointerup',up); cv.addEventListener('pointerleave',up);
+
+    let drawing=false, pts=[], snapshot=null, raf=0;
+    const pos=ev=>{ const r=cv.getBoundingClientRect(); return [ev.clientX-r.left, ev.clientY-r.top]; };
+    // gather every high-frequency pencil sample (coalesced) between frames
+    function pushFrom(e){
+      let list=[e];
+      if(e.getCoalescedEvents){ const c=e.getCoalescedEvents(); if(c && c.length) list=c; }
+      for(const ev of list){
+        const p=pos(ev), last=pts[pts.length-1];
+        if(!last || (p[0]-last[0])*(p[0]-last[0])+(p[1]-last[1])*(p[1]-last[1]) >= 0.6) pts.push(p);
+      }
+    }
+    // redraw committed bitmap + the WHOLE current stroke as one smooth Catmull-Rom spline
+    function drawSmooth(){
+      const ctx=cv._ctx; if(snapshot) ctx.putImageData(snapshot,0,0);
+      if(!pts.length) return;
+      ctx.save();
+      ctx.globalCompositeOperation = eraser?'destination-out':'source-over';
+      ctx.strokeStyle='#000000'; ctx.fillStyle='#000000';
+      ctx.lineWidth=eraser?pen*3:pen; ctx.lineCap='round'; ctx.lineJoin='round';
+      if(pts.length===1){ const p=pts[0]; ctx.beginPath(); ctx.arc(p[0],p[1],Math.max(.4,ctx.lineWidth/2),0,6.2832); ctx.fill(); ctx.restore(); return; }
+      ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]);
+      for(let i=0;i<pts.length-1;i++){
+        const p0=pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||p2;
+        const c1x=p1[0]+(p2[0]-p0[0])/6, c1y=p1[1]+(p2[1]-p0[1])/6;
+        const c2x=p2[0]-(p3[0]-p1[0])/6, c2y=p2[1]-(p3[1]-p1[1])/6;
+        ctx.bezierCurveTo(c1x,c1y,c2x,c2y,p2[0],p2[1]);
+      }
+      ctx.stroke(); ctx.restore();
+    }
+    function schedule(){ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; drawSmooth(); }); }
+    function down(e){ e.preventDefault(); drawing=true;
+      try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+      snapshot=cv._ctx.getImageData(0,0,cv.width,cv.height);
+      pts=[]; pushFrom(e); drawSmooth();
+    }
+    function move(e){ if(!drawing)return; e.preventDefault(); pushFrom(e); schedule(); }
+    function up(e){ if(!drawing)return; drawing=false;
+      if(raf){ cancelAnimationFrame(raf); raf=0; } drawSmooth(); snapshot=null; pts=[];
+      try{ store[key]=cv.toDataURL('image/png'); cell.classList.add('filled');
+        if(key.indexOf('syl-')===0) extractFromSyllable(+key.slice(4)); }catch(_){}
+    }
+    cv.addEventListener('pointerdown',down);
+    cv.addEventListener('pointermove',move);
+    cv.addEventListener('pointerup',up);
+    cv.addEventListener('pointercancel',up);
   }
 
   // ---------- captions ----------
