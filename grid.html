@@ -1,0 +1,674 @@
+<!-- 한글 폰트 작도 그리드 / Hangul Font Design Grid -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>한글 폰트 작도 그리드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=Nanum+Myeongjo:wght@400;700&family=Nanum+Pen+Script&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/imagetracerjs/1.2.6/imagetracer_v1.2.6.min.js"></script>
+<style>
+  :root{
+    --paper:#f3eee2; --paper2:#ece5d4; --ink:#211e1a; --ink-soft:#5a544a;
+    --cinnabar:#c1442e; --cinnabar-deep:#9c3324;
+    --guide:#8aa0ad; --guide-soft:#c7cdcb; --zone:#bbcdd6;
+    --line:#d8cfba; --line2:#cabfa6;
+    --sans:"Gowun Dodum",system-ui,sans-serif;
+    --serif:"Gowun Batang",serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(circle at 12% 8%, rgba(193,68,46,.04), transparent 40%),
+      var(--paper);
+    color:var(--ink); font-family:var(--sans);
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  /* subtle paper grain */
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.5;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+  }
+  .wrap{position:relative; z-index:1; max-width:1180px; margin:0 auto; padding:34px 22px 90px}
+
+  header.mast{ border-bottom:2px solid var(--ink); padding-bottom:18px; margin-bottom:8px;}
+  .mast-top{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;}
+  .seal{
+    font-family:var(--serif); font-weight:700; color:#fff; background:var(--cinnabar);
+    width:46px;height:46px; display:grid; place-items:center; font-size:26px;
+    border-radius:6px; box-shadow:0 3px 0 var(--cinnabar-deep); flex:none;
+    transform:rotate(-2deg);
+  }
+  h1{font-family:var(--serif); font-weight:700; font-size:30px; margin:0; letter-spacing:.5px;}
+  h1 .en{font-family:var(--mono); font-size:12px; font-weight:400; color:var(--ink-soft); letter-spacing:1px; display:block; margin-top:2px;}
+  .kicker{font-family:var(--mono); font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--cinnabar); margin-left:auto;}
+  .lead{color:var(--ink-soft); font-size:14px; max-width:760px; margin:14px 0 0;}
+  .lead b{color:var(--ink); font-weight:400; border-bottom:1.5px solid var(--cinnabar);}
+
+  /* sticky toolbar */
+  .toolbar{
+    position:sticky; top:0; z-index:20; margin:20px 0 22px;
+    background:rgba(243,238,226,.92); backdrop-filter:blur(6px);
+    border:1.5px solid var(--ink); border-radius:10px; padding:10px 12px;
+    display:flex; flex-wrap:wrap; gap:14px 18px; align-items:center;
+    box-shadow:0 4px 0 rgba(33,30,26,.12);
+  }
+  .tabs{display:flex; gap:4px; background:var(--paper2); padding:4px; border-radius:8px; border:1px solid var(--line);}
+  .tab{
+    font-family:var(--serif); font-size:15px; font-weight:700; padding:6px 16px;
+    border:none; background:transparent; color:var(--ink-soft); cursor:pointer; border-radius:6px;
+  }
+  .tab.on{background:var(--ink); color:var(--paper);}
+  .tgroup{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink-soft);}
+  .tgroup label{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase;}
+  .chip{display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; font-size:12px;}
+  .chip input{accent-color:var(--cinnabar); width:15px; height:15px;}
+  select, .pen{font-family:var(--mono); font-size:12px; border:1px solid var(--ink); background:var(--paper); color:var(--ink); border-radius:6px; padding:4px 6px;}
+  .pens{display:flex; gap:4px;}
+  .pens button{width:26px;height:26px; border:1px solid var(--line); background:var(--paper); border-radius:6px; cursor:pointer; display:grid; place-items:center;}
+  .pens button.on{border-color:var(--ink); background:var(--ink);}
+  .pens button.on .dot{background:var(--paper);}
+  .dot{background:var(--ink); border-radius:50%}
+  .act{margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;}
+  .btn{font-family:var(--mono); font-size:11px; letter-spacing:.5px; padding:7px 12px; border:1.5px solid var(--ink); background:var(--paper); color:var(--ink); border-radius:7px; cursor:pointer; text-transform:uppercase;}
+  .btn:hover{background:var(--ink); color:var(--paper);}
+  .btn.red{border-color:var(--cinnabar); color:var(--cinnabar);}
+  .btn.red:hover{background:var(--cinnabar); color:#fff;}
+
+  /* sections */
+  .panel{display:none;} .panel.on{display:block;}
+  .sec-h{display:flex; align-items:baseline; gap:12px; margin:30px 0 6px; padding-bottom:6px; border-bottom:1px dashed var(--line2);}
+  .sec-h h2{font-family:var(--serif); font-size:20px; margin:0; font-weight:700;}
+  .sec-h .meta{font-family:var(--mono); font-size:11px; color:var(--cinnabar); letter-spacing:1px;}
+  .sec-h .desc{font-size:12px; color:var(--ink-soft); margin-left:auto;}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(118px,1fr)); gap:14px; margin-top:14px;}
+
+  /* a drawing cell */
+  .cell{position:relative; background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:6px; box-shadow:0 2px 0 rgba(33,30,26,.05);}
+  .cell .box{position:relative; width:100%; aspect-ratio:1/1; border-radius:4px; overflow:hidden; background:#fbf8f0; cursor:crosshair; touch-action:none;}
+  .cell .box svg, .cell .box .ref, .cell canvas{position:absolute; inset:0; width:100%; height:100%;}
+  .cell .ref{display:grid; place-items:center; font-size:74px; color:var(--ink); pointer-events:none; opacity:0; line-height:1;}
+  .cell canvas{z-index:2;}
+  .cell .cap{display:flex; align-items:center; justify-content:space-between; margin-top:6px; gap:6px;}
+  .cell .uni{font-family:var(--mono); font-size:9.5px; color:var(--ink-soft); line-height:1.25;}
+  .cell .uni b{color:var(--cinnabar); font-weight:600;}
+  .cell .nm{font-family:var(--serif); font-size:13px; font-weight:700;}
+  .cell .x{border:none; background:transparent; color:var(--guide); cursor:pointer; font-size:14px; padding:0 2px; line-height:1;}
+  .cell .x:hover{color:var(--cinnabar);}
+  .cell.filled{border-color:var(--cinnabar); box-shadow:0 2px 0 rgba(193,68,46,.18);}
+
+  /* composer */
+  .composer{display:grid; grid-template-columns:repeat(3,1fr) 1.3fr; gap:16px; align-items:end; background:var(--paper2); border:1px solid var(--line); border-radius:10px; padding:16px; margin-top:14px;}
+  .composer .field label{display:block; font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-soft); margin-bottom:5px;}
+  .composer select{width:100%; padding:7px 8px; font-size:16px; font-family:var(--serif);}
+  .composer .result{display:flex; align-items:center; gap:14px;}
+  .composer .preview{font-family:var(--serif); font-size:52px; line-height:1; width:74px; text-align:center;}
+  .composer .info{font-family:var(--mono); font-size:11px; color:var(--ink-soft);}
+  .composer .info .big{color:var(--cinnabar); font-size:14px; font-weight:600;}
+  .composer .info .type{display:inline-block; margin-top:4px; padding:2px 7px; background:var(--ink); color:var(--paper); border-radius:4px; font-size:9px; letter-spacing:.5px;}
+
+  .browse-bar{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px; font-size:12px;}
+  .browse-bar select{font-family:var(--serif); font-size:15px;}
+  .pageinfo{font-family:var(--mono); font-size:11px; color:var(--ink-soft);}
+
+  .legend{display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; font-family:var(--mono); font-size:10px; color:var(--ink-soft);}
+  .legend span{display:inline-flex; align-items:center; gap:5px;}
+  .sw{width:13px;height:13px; border-radius:3px; display:inline-block;}
+
+  /* build panel */
+  .build{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:14px;}
+  .calc{background:var(--paper2); border:1px solid var(--line); border-radius:10px; padding:16px 18px; display:flex; flex-direction:column; gap:12px;}
+  .calc .row{display:flex; flex-direction:column; gap:5px;}
+  .calc .row label{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-soft); display:flex; justify-content:space-between;}
+  .calc .row label b{color:var(--cinnabar); font-weight:600;}
+  .calc input[type=text],.calc input[type=number]{font-family:var(--mono); font-size:13px; border:1px solid var(--ink); background:var(--paper); color:var(--ink); border-radius:6px; padding:7px 8px;}
+  .calc .pair{display:flex; gap:8px;} .calc .pair input{flex:1; width:100%;}
+  .calc input[type=range]{accent-color:var(--cinnabar); width:100%;}
+  .stats{background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:6px 16px; display:flex; flex-direction:column; justify-content:center;}
+  .stat{display:flex; align-items:baseline; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--line2); font-size:13px; color:var(--ink-soft);}
+  .stat:last-child{border-bottom:none;}
+  .stat b{font-family:var(--mono); font-size:18px; color:var(--ink); font-weight:600;}
+  .stat b i{font-style:normal; font-size:12px; color:var(--ink-soft);}
+  .buildact{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px;}
+  .buildact .btn{font-size:13px; padding:10px 18px;}
+  #b-otf:disabled{opacity:.4; cursor:not-allowed;} #b-otf:disabled:hover{background:var(--paper); color:var(--ink);}
+  #prev-text{width:100%; font-family:var(--serif); font-size:16px; border:1px solid var(--ink); background:var(--paper); border-radius:7px; padding:9px 11px; margin-top:6px;}
+  .preview-stage{margin-top:14px; min-height:160px; background:#fbf8f0; border:1px solid var(--line); border-radius:10px; padding:22px 24px; font-size:46px; line-height:1.55; color:var(--ink); word-break:break-all;}
+  .preview-stage.empty{display:grid; place-items:center; color:var(--guide); font-family:var(--mono); font-size:13px;}
+  @media(max-width:620px){ .build{grid-template-columns:1fr;} }
+  footer{margin-top:50px; padding-top:18px; border-top:1px solid var(--line); font-size:12px; color:var(--ink-soft);}
+  footer b{color:var(--ink); font-weight:400;}
+  .toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:12px; padding:10px 18px; border-radius:8px; opacity:0; transition:.3s; z-index:50; pointer-events:none;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  @media(max-width:620px){ .composer{grid-template-columns:repeat(3,1fr);} .composer .result{grid-column:1/-1;} h1{font-size:24px} }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <div class="mast-top">
+      <div class="seal">字</div>
+      <h1>한글 폰트 작도 그리드<span class="en">HANGUL FONT DESIGN GRID · KS X 1001 / UNICODE</span></h1>
+      <span class="kicker">상용 폰트 제작</span>
+    </div>
+    <p class="lead">자모와 음절을 칸 안에 직접 그리며 글꼴 설계를 잡는 작업대입니다. 셀마다 <b>호환 자모·조합용 자모·음절 코드포인트</b>가 함께 표기되고, 모임꼴별 초/중/종 배치 존과 레퍼런스 글꼴 트레이싱을 켤 수 있습니다. PNG로 내보내 FontForge·Glyphs 배경 이미지로 따라 그리세요.</p>
+  </header>
+
+  <div class="toolbar">
+    <div class="tabs">
+      <button class="tab on" data-tab="jamo">자모</button>
+      <button class="tab" data-tab="glyph">글자</button>
+      <button class="tab" data-tab="build">폰트 빌드</button>
+    </div>
+    <div class="tgroup">
+      <label>펜</label>
+      <div class="pens" id="pens"></div>
+    </div>
+    <div class="tgroup">
+      <label class="chip"><input type="checkbox" id="tg-guide" checked> 보조선</label>
+      <label class="chip"><input type="checkbox" id="tg-zone" checked> 배치존</label>
+      <label class="chip"><input type="checkbox" id="tg-eraser"> 지우개</label>
+    </div>
+    <div class="tgroup">
+      <label>레퍼런스</label>
+      <select id="ref-font">
+        <option value="">없음</option>
+        <option value="'Gowun Batang',serif">고운바탕(명조)</option>
+        <option value="'Nanum Myeongjo',serif">나눔명조</option>
+        <option value="'Gowun Dodum',sans-serif">고운돋움(고딕)</option>
+        <option value="'Nanum Pen Script',cursive">손글씨</option>
+      </select>
+    </div>
+    <div class="act">
+      <button class="btn" id="b-save">저장</button>
+      <button class="btn" id="b-load">불러오기</button>
+      <button class="btn" id="b-sheet">시트 PNG</button>
+      <button class="btn red" id="b-clear">전체지우기</button>
+    </div>
+  </div>
+
+  <!-- ================= JAMO ================= -->
+  <div class="panel on" id="panel-jamo">
+    <div class="sec-h"><h2>초성</h2><span class="meta">CHOSEONG · 19</span><span class="desc">조합용 U+1100– · 호환 U+3131–</span></div>
+    <div class="grid" id="g-cho"></div>
+
+    <div class="sec-h"><h2>중성</h2><span class="meta">JUNGSEONG · 21</span><span class="desc">조합용 U+1161– · 모음</span></div>
+    <div class="grid" id="g-jung"></div>
+
+    <div class="sec-h"><h2>종성 (받침)</h2><span class="meta">JONGSEONG · 27</span><span class="desc">조합용 U+11A8– · 겹받침 포함</span></div>
+    <div class="grid" id="g-jong"></div>
+  </div>
+
+  <!-- ================= GLYPH ================= -->
+  <div class="panel" id="panel-glyph">
+    <div class="sec-h"><h2>음절 조합기</h2><span class="meta">SYLLABLE COMPOSER</span><span class="desc">초·중·종 선택 → 코드포인트·모임꼴 자동</span></div>
+    <div class="composer">
+      <div class="field"><label>초성</label><select id="c-cho"></select></div>
+      <div class="field"><label>중성</label><select id="c-jung"></select></div>
+      <div class="field"><label>종성</label><select id="c-jong"></select></div>
+      <div class="result">
+        <div class="preview" id="c-prev">가</div>
+        <div class="info">
+          <div class="big" id="c-uni">U+AC00</div>
+          <div id="c-dec">44032 · 가나다순 #1</div>
+          <span class="type" id="c-type">받침없음 · 세로모음</span>
+        </div>
+      </div>
+    </div>
+    <div class="grid" id="g-composer" style="margin-top:18px;max-width:280px"></div>
+
+    <div class="sec-h"><h2>모임꼴 6종 대표자</h2><span class="meta">6 COMPOSITION TYPES</span><span class="desc">설계 기준이 되는 구조 분류</span></div>
+    <div class="grid" id="g-types"></div>
+
+    <div class="sec-h"><h2>음절 둘러보기</h2><span class="meta">U+AC00 – U+D7A3 · 11,172</span><span class="desc">초성 블록별 588자</span></div>
+    <div class="browse-bar">
+      <span>초성</span>
+      <select id="br-cho"></select>
+      <button class="btn" id="br-prev">◀ 이전</button>
+      <span class="pageinfo" id="br-info"></span>
+      <button class="btn" id="br-next">다음 ▶</button>
+    </div>
+    <div class="grid" id="g-browse"></div>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--zone)"></i> 초성존</span>
+      <span><i class="sw" style="background:#d6c7bb"></i> 중성존</span>
+      <span><i class="sw" style="background:#cfd9c0"></i> 종성존</span>
+      <span><i class="sw" style="border:1px solid var(--guide);background:transparent"></i> em-box / 글자면적</span>
+    </div>
+  </div>
+
+  <!-- ================= BUILD ================= -->
+  <div class="panel" id="panel-build">
+    <div class="sec-h"><h2>폰트 빌드 계산기</h2><span class="meta">RASTER → OUTLINE → OTF</span><span class="desc">칸에 그린 글리프를 실제 폰트로 조립</span></div>
+    <div class="build">
+      <div class="calc">
+        <div class="row"><label>폰트 이름 / FAMILY</label><input type="text" id="f-name" value="MyHangul"></div>
+        <div class="row"><label>UPM · UNITS PER EM</label><input type="number" id="f-upm" value="1000"></div>
+        <div class="row"><label>어센더 / 디센더</label><span class="pair"><input type="number" id="f-asc" value="880"><input type="number" id="f-desc" value="-120"></span></div>
+        <div class="row"><label>글자 채움 (em 대비) <b id="f-fillv">86%</b></label><input type="range" id="f-fill" min="50" max="100" value="86"></div>
+        <div class="row"><label>외곽선 임계값 <b id="f-thv">128</b></label><input type="range" id="f-th" min="40" max="220" value="128"></div>
+        <div class="row"><label>곡선 단순화 <b id="f-dtv">8</b></label><input type="range" id="f-dt" min="1" max="30" value="8"></div>
+        <label class="chip" style="font-size:12px;color:var(--ink-soft)"><input type="checkbox" id="f-hole" checked> 구멍(속파임) 보정 · ㅇ ㅎ ㅁ 등</label>
+      </div>
+      <div class="stats" id="f-stats"></div>
+    </div>
+    <div class="buildact">
+      <button class="btn red" id="b-build">폰트 생성 · 미리보기</button>
+      <button class="btn" id="b-otf" disabled>.OTF 내려받기</button>
+      <span class="pageinfo" id="b-prog"></span>
+    </div>
+
+    <div class="sec-h"><h2>미리보기</h2><span class="meta">LIVE FONTFACE</span><span class="desc">생성한 폰트로 즉시 렌더링</span></div>
+    <input type="text" id="prev-text" value="가나다라 마바사 아자차카 타파하 한글 폰트 12345">
+    <div class="preview-stage empty" id="prev-stage">‹ 폰트 생성 › 후 이 영역에 표시됩니다</div>
+  </div>
+
+  <footer>
+    <b>유니코드 메모.</b> 음절 코드 = 0xAC00 + ((초성×21) + 중성) × 28 + 종성. 조합용 자모(초성 U+1100·중성 U+1161·종성 U+11A8)는 폰트의 실제 글리프 단위이고, 호환 자모(U+3130 블록)는 자모 단독 표기용입니다. 상용 한글은 <b>KS X 1001 2,350자</b>가 기준이며 현대 한글 전체는 11,172자입니다. · 작업물은 브라우저에 저장되며 PNG는 폰트 편집기 트레이싱 배경으로 사용하세요.
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  // ---------- data ----------
+  const CHO=['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+  const JUNG=['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
+  const JONG=['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+  const VERT=['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅣ'];     // 세로모음 (오른쪽)
+  const HORZ=['ㅗ','ㅛ','ㅜ','ㅠ','ㅡ'];                         // 가로모음 (아래)
+  // 나머지 ㅘㅙㅚㅝㅞㅟㅢ → 섞임
+  const hex=c=>'U+'+c.codePointAt(0).toString(16).toUpperCase().padStart(4,'0');
+  function vowelType(v){ if(VERT.includes(v))return 'vert'; if(HORZ.includes(v))return 'horz'; return 'mix'; }
+  function compType(jungIdx,jongIdx){
+    const t=vowelType(JUNG[jungIdx]); const bat=jongIdx>0;
+    return {bat, vt:t};
+  }
+  function typeLabel(jungIdx,jongIdx){
+    const {bat,vt}=compType(jungIdx,jongIdx);
+    const v= vt==='vert'?'세로모음': vt==='horz'?'가로모음':'섞임모음';
+    return (bat?'받침있음':'받침없음')+' · '+v;
+  }
+  function syllCode(ci,ji,ki){ return 0xAC00 + ((ci*21)+ji)*28 + ki; }
+
+  // ---------- state ----------
+  const store={};            // key -> dataURL
+  let pen=4, eraser=false, showGuide=true, showZone=true, refFont='';
+  const STORAGE_KEY='hangul_font_grid_v1';
+
+  // ---------- guides svg ----------
+  function guideSVG(opt){
+    // opt: {vt, bat}  for syllable zones; null for plain jamo box
+    const g=showGuide;
+    let zones='';
+    if(showZone && opt){
+      const Z={vert:{cho:[6,6,46,88], jung:[54,6,40,88]},
+               horz:{cho:[6,6,88,46], jung:[6,54,88,40]},
+               mix :{cho:[6,6,52,52], jung:[6,6,88,88]}};
+      // batim shrinks main and adds 종성 band
+      let cho,jung,jong=null;
+      const vt=opt.vt;
+      if(!opt.bat){
+        cho=Z[vt].cho.slice(); jung=Z[vt].jung.slice();
+        if(vt==='mix'){ cho=[6,6,50,50]; jung=[6,6,88,88]; }
+      } else {
+        if(vt==='vert'){ cho=[6,6,46,64]; jung=[54,6,40,64]; jong=[6,64,88,30]; }
+        else if(vt==='horz'){ cho=[6,6,88,34]; jung=[6,40,88,28]; jong=[6,64,88,30]; }
+        else { cho=[6,6,44,44]; jung=[6,6,88,58]; jong=[6,64,88,30]; }
+      }
+      const r=(c,col,lbl)=>`<rect x="${c[0]}" y="${c[1]}" width="${c[2]}" height="${c[3]}" rx="2" fill="${col}" opacity=".5"/><text x="${c[0]+3}" y="${c[1]+10}" font-size="6" font-family="monospace" fill="#6b6256" opacity=".8">${lbl}</text>`;
+      zones += r(cho,'#bbcdd6','초');
+      // draw jung behind/around with low opacity so overlap reads
+      zones = r(jung,'#d6c7bb','중') + zones;
+      if(jong) zones += r(jong,'#cfd9c0','종');
+    }
+    let lines='';
+    if(g){
+      lines=`
+        <rect x="3" y="3" width="94" height="94" fill="none" stroke="var(--guide)" stroke-width=".7" opacity=".55"/>
+        <rect x="11" y="11" width="78" height="78" fill="none" stroke="var(--guide)" stroke-width=".5" stroke-dasharray="2 2" opacity=".5"/>
+        <line x1="50" y1="3" x2="50" y2="97" stroke="var(--guide)" stroke-width=".4" opacity=".4"/>
+        <line x1="3" y1="50" x2="97" y2="50" stroke="var(--guide)" stroke-width=".4" opacity=".4"/>`;
+    }
+    return `<svg viewBox="0 0 100 100" preserveAspectRatio="none">${zones}${lines}</svg>`;
+  }
+
+  // ---------- build a cell ----------
+  function makeCell(ch, captionHTML, key, opt){
+    const cell=document.createElement('div'); cell.className='cell'; cell.dataset.key=key;
+    const box=document.createElement('div'); box.className='box';
+    box.innerHTML=guideSVG(opt);
+    const ref=document.createElement('div'); ref.className='ref'; ref.textContent=ch||''; ref.style.fontFamily=refFont||'var(--serif)'; ref.style.opacity=refFont?'.16':'0';
+    box.appendChild(ref);
+    const cv=document.createElement('canvas'); box.appendChild(cv);
+    const cap=document.createElement('div'); cap.className='cap'; cap.innerHTML=captionHTML;
+    const x=document.createElement('button'); x.className='x'; x.title='지우기'; x.textContent='⟲';
+    cap.appendChild(x);
+    cell.appendChild(box); cell.appendChild(cap);
+    setupCanvas(cv, cell, key);
+    x.onclick=()=>{ const ctx=cv._ctx; ctx.clearRect(0,0,cv.width,cv.height); delete store[key]; cell.classList.remove('filled'); };
+    cell._ref=ref;
+    return cell;
+  }
+
+  function setupCanvas(cv, cell, key){
+    const box=cv.parentElement;
+    function resize(){
+      const r=box.getBoundingClientRect(); const dpr=window.devicePixelRatio||1;
+      const prev=store[key];
+      cv.width=Math.max(1,Math.round(r.width*dpr)); cv.height=Math.max(1,Math.round(r.height*dpr));
+      const ctx=cv.getContext('2d'); ctx.scale(dpr,dpr); ctx.lineCap='round'; ctx.lineJoin='round';
+      cv._ctx=ctx; cv._w=r.width; cv._h=r.height;
+      if(prev){ const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0,r.width,r.height); img.src=prev; cell.classList.add('filled'); }
+    }
+    // defer resize until in layout
+    requestAnimationFrame(resize);
+    cv._resize=resize;
+    let drawing=false,lx=0,ly=0;
+    const pos=e=>{ const r=cv.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return [t.clientX-r.left, t.clientY-r.top]; };
+    function down(e){ e.preventDefault(); drawing=true; const ctx=cv._ctx; [lx,ly]=pos(e);
+      ctx.globalCompositeOperation = eraser?'destination-out':'source-over';
+      ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--ink').trim()||'#211e1a';
+      ctx.lineWidth=eraser?pen*3:pen;
+      ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(lx+.1,ly+.1); ctx.stroke();
+    }
+    function move(e){ if(!drawing)return; e.preventDefault(); const ctx=cv._ctx; const [x,y]=pos(e);
+      ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(x,y); ctx.stroke(); lx=x; ly=y;
+    }
+    function up(){ if(!drawing)return; drawing=false; try{ store[key]=cv.toDataURL('image/png'); cell.classList.add('filled'); }catch(e){} }
+    cv.addEventListener('pointerdown',down); cv.addEventListener('pointermove',move);
+    window.addEventListener('pointerup',up); cv.addEventListener('pointerleave',up);
+  }
+
+  // ---------- captions ----------
+  function jamoCap(ch, conjBase, idx){
+    const conj='U+'+(conjBase+idx).toString(16).toUpperCase().padStart(4,'0');
+    return `<div><div class="nm">${ch}</div><div class="uni"><b>${hex(ch)}</b><br>조합 ${conj}</div></div>`;
+  }
+  function syllCap(ci,ji,ki){
+    const code=syllCode(ci,ji,ki); const ch=String.fromCodePoint(code);
+    return {ch, html:`<div><div class="nm">${ch}</div><div class="uni"><b>U+${code.toString(16).toUpperCase()}</b><br>${code}</div></div>`};
+  }
+
+  // ---------- render jamo ----------
+  function renderJamo(){
+    const gc=document.getElementById('g-cho'); gc.innerHTML='';
+    CHO.forEach((c,i)=>gc.appendChild(makeCell(c, jamoCap(c,0x1100,i), 'cho-'+i, null)));
+    const gj=document.getElementById('g-jung'); gj.innerHTML='';
+    JUNG.forEach((v,i)=>gj.appendChild(makeCell(v, jamoCap(v,0x1161,i), 'jung-'+i, null)));
+    const gk=document.getElementById('g-jong'); gk.innerHTML='';
+    JONG.forEach((b,i)=>{ if(i===0)return; gk.appendChild(makeCell(b, jamoCap(b,0x11A7,i), 'jong-'+i, null)); });
+  }
+
+  // ---------- composer ----------
+  function fillSel(sel, arr, withNone){
+    sel.innerHTML='';
+    arr.forEach((v,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent= (withNone&&i===0)?'(받침없음)':v; sel.appendChild(o); });
+  }
+  let composerCell=null;
+  function renderComposer(){
+    const sc=document.getElementById('c-cho'), sj=document.getElementById('c-jung'), sk=document.getElementById('c-jong');
+    fillSel(sc,CHO); fillSel(sj,JUNG); fillSel(sk,JONG,true);
+    function upd(){
+      const ci=+sc.value, ji=+sj.value, ki=+sk.value;
+      const code=syllCode(ci,ji,ki); const ch=String.fromCodePoint(code);
+      document.getElementById('c-prev').textContent=ch;
+      document.getElementById('c-prev').style.fontFamily=refFont||'var(--serif)';
+      document.getElementById('c-uni').textContent='U+'+code.toString(16).toUpperCase();
+      document.getElementById('c-dec').textContent=code+' · 가나다순 #'+(code-0xAC00+1);
+      document.getElementById('c-type').textContent=typeLabel(ji,ki);
+      // rebuild composer drawing cell
+      const wrap=document.getElementById('g-composer'); wrap.innerHTML='';
+      const {bat,vt}=compType(ji,ki);
+      const cap=`<div><div class="nm">${ch}</div><div class="uni"><b>U+${code.toString(16).toUpperCase()}</b><br>${code}</div></div>`;
+      composerCell=makeCell(ch, cap, 'syl-'+code, {vt,bat});
+      wrap.appendChild(composerCell);
+    }
+    [sc,sj,sk].forEach(s=>s.onchange=upd); upd();
+  }
+
+  // ---------- 6 types ----------
+  const TYPES=[
+    {ci:0,ji:0,ki:0, t:'받침없음 · 세로모음'},  // 가
+    {ci:0,ji:8,ki:0, t:'받침없음 · 가로모음'},  // 고
+    {ci:0,ji:9,ki:0, t:'받침없음 · 섞임모음'},  // 과
+    {ci:0,ji:0,ki:21,t:'받침있음 · 세로모음'},  // 강 (ㅇ=21)
+    {ci:0,ji:8,ki:1, t:'받침있음 · 가로모음'},  // 곡
+    {ci:0,ji:9,ki:21,t:'받침있음 · 섞임모음'}   // 광
+  ];
+  function renderTypes(){
+    const g=document.getElementById('g-types'); g.innerHTML='';
+    TYPES.forEach(T=>{
+      const {ch,html}=syllCap(T.ci,T.ji,T.ki);
+      const cap=html.replace('</div></div>', `</div><div class="uni" style="margin-top:2px;color:var(--cinnabar)">${T.t}</div></div>`);
+      const {bat,vt}=compType(T.ji,T.ki);
+      g.appendChild(makeCell(ch, cap, 'syl-'+syllCode(T.ci,T.ji,T.ki), {vt,bat}));
+    });
+  }
+
+  // ---------- browse ----------
+  let brCho=0, brPage=0; const PER=56;
+  function renderBrowseControls(){
+    const s=document.getElementById('br-cho'); fillSel(s,CHO); s.onchange=()=>{ brCho=+s.value; brPage=0; renderBrowse(); };
+    document.getElementById('br-prev').onclick=()=>{ if(brPage>0){brPage--; renderBrowse();} };
+    document.getElementById('br-next').onclick=()=>{ if((brPage+1)*PER<588){brPage++; renderBrowse();} };
+  }
+  function renderBrowse(){
+    const g=document.getElementById('g-browse'); g.innerHTML='';
+    const start=brPage*PER, end=Math.min(588,start+PER);
+    for(let n=start;n<end;n++){
+      const ji=Math.floor(n/28), ki=n%28;
+      const code=syllCode(brCho,ji,ki); const ch=String.fromCodePoint(code);
+      const cap=`<div><div class="nm">${ch}</div><div class="uni"><b>U+${code.toString(16).toUpperCase()}</b></div></div>`;
+      const {bat,vt}=compType(ji,ki);
+      g.appendChild(makeCell(ch, cap, 'syl-'+code, {vt,bat}));
+    }
+    document.getElementById('br-info').textContent=`${CHO[brCho]} 블록 · ${start+1}–${end} / 588 (p.${brPage+1}/11)`;
+  }
+
+  // ---------- toolbar wiring ----------
+  function buildPens(){
+    const wrap=document.getElementById('pens'); const sizes=[2,4,7,12];
+    sizes.forEach(s=>{ const b=document.createElement('button'); if(s===pen)b.classList.add('on');
+      const d=document.createElement('span'); d.className='dot'; const px=Math.max(4,s); d.style.width=px+'px'; d.style.height=px+'px';
+      b.appendChild(d); b.onclick=()=>{ pen=s; eraser=false; document.getElementById('tg-eraser').checked=false; [...wrap.children].forEach(c=>c.classList.remove('on')); b.classList.add('on'); }; wrap.appendChild(b); });
+  }
+  function refreshGuides(){
+    // re-render all panels keeping drawings (store persists)
+    renderJamo(); renderComposer(); renderTypes(); renderBrowse();
+  }
+  function setRef(){
+    document.querySelectorAll('.cell').forEach(c=>{ if(c._ref){ c._ref.style.fontFamily=refFont||'var(--serif)'; c._ref.style.opacity=refFont?'.16':'0'; }});
+    const p=document.getElementById('c-prev'); if(p) p.style.fontFamily=refFont||'var(--serif)';
+  }
+
+  function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1800); }
+
+  // tabs
+  document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on')); t.classList.add('on');
+    const id=t.dataset.tab;
+    document.getElementById('panel-jamo').classList.toggle('on',id==='jamo');
+    document.getElementById('panel-glyph').classList.toggle('on',id==='glyph');
+    document.getElementById('panel-build').classList.toggle('on',id==='build');
+    if(id==='build') updateStats();
+    // canvases that were hidden need resize
+    requestAnimationFrame(()=>document.querySelectorAll('.panel.on canvas').forEach(cv=>cv._resize&&cv._resize()));
+  });
+
+  document.getElementById('tg-guide').onchange=e=>{ showGuide=e.target.checked; refreshGuides(); };
+  document.getElementById('tg-zone').onchange=e=>{ showZone=e.target.checked; refreshGuides(); };
+  document.getElementById('tg-eraser').onchange=e=>{ eraser=e.target.checked; };
+  document.getElementById('ref-font').onchange=e=>{ refFont=e.target.value; setRef(); };
+
+  // save / load via persistent storage
+  document.getElementById('b-save').onclick=async()=>{
+    try{ await window.storage.set(STORAGE_KEY, JSON.stringify(store), false); toast('저장됨 · '+Object.keys(store).length+'칸'); }
+    catch(e){ toast('저장 실패 (브라우저 저장 불가)'); }
+  };
+  document.getElementById('b-load').onclick=async()=>{
+    try{ const r=await window.storage.get(STORAGE_KEY,false); if(r&&r.value){ const o=JSON.parse(r.value); Object.assign(store,o); refreshGuides(); setRef(); toast('불러옴 · '+Object.keys(o).length+'칸'); } else toast('저장된 작업 없음'); }
+    catch(e){ toast('저장된 작업 없음'); }
+  };
+  document.getElementById('b-clear').onclick=()=>{
+    if(!confirm('현재 모든 칸의 작도를 지웁니다. 계속할까요?'))return;
+    for(const k in store) delete store[k]; refreshGuides(); toast('전체 지움');
+  };
+
+  // export current visible panel as a contact sheet
+  document.getElementById('b-sheet').onclick=()=>{
+    const cells=[...document.querySelectorAll('.panel.on .cell')];
+    if(!cells.length){ toast('내보낼 칸 없음'); return; }
+    const S=140, cols=Math.min(10,Math.ceil(Math.sqrt(cells.length))); const rows=Math.ceil(cells.length/cols);
+    const pad=8, lbl=18; const cw=S, chh=S+lbl;
+    const out=document.createElement('canvas'); out.width=cols*(cw+pad)+pad; out.height=rows*(chh+pad)+pad+30;
+    const ctx=out.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,out.width,out.height);
+    ctx.fillStyle='#211e1a'; ctx.font='600 14px monospace'; ctx.fillText('HANGUL FONT GRID — '+(document.querySelector('.tab.on').textContent), pad, 20);
+    cells.forEach((cell,i)=>{
+      const cx=pad+(i%cols)*(cw+pad), cy=30+pad+Math.floor(i/cols)*(chh+pad);
+      ctx.strokeStyle='#ddd'; ctx.strokeRect(cx,cy,cw,S);
+      const cv=cell.querySelector('canvas'); if(cv) ctx.drawImage(cv,cx,cy,cw,S);
+      ctx.fillStyle='#211e1a'; ctx.font='600 13px serif';
+      const nm=cell.querySelector('.nm'); if(nm) ctx.fillText(nm.textContent, cx+4, cy+S+13);
+      const uni=cell.querySelector('.uni b'); ctx.font='9px monospace'; ctx.fillStyle='#c1442e';
+      if(uni) ctx.fillText(uni.textContent, cx+24, cy+S+13);
+    });
+    const a=document.createElement('a'); a.download='hangul_grid_sheet.png'; a.href=out.toDataURL('image/png'); a.click();
+    toast('시트 PNG 저장');
+  };
+
+  // ================= FONT BUILD ENGINE =================
+  const TRACE_BASE={ ltres:1, qtres:1, pathomit:8, rightangleenhance:true,
+    pal:[{r:255,g:255,b:255,a:255},{r:0,g:0,b:0,a:255}], colorsampling:0, numberofcolors:2,
+    mincolorratio:0, colorquantcycles:1, blurradius:0, blurdelta:20, strokewidth:0,
+    linefilter:false, scale:1, roundcoords:2, viewbox:false, desc:false };
+  let lastBuf=null, lastUrl=null;
+  const gv=id=>document.getElementById(id).value;
+
+  function keyToCp(k){
+    if(k.indexOf('cho-')===0)  return CHO[+k.slice(4)].codePointAt(0);
+    if(k.indexOf('jung-')===0) return JUNG[+k.slice(5)].codePointAt(0);
+    if(k.indexOf('jong-')===0) return JONG[+k.slice(5)].codePointAt(0);
+    if(k.indexOf('syl-')===0)  return +k.slice(4);
+    return null;
+  }
+
+  function updateStats(){
+    const keys=Object.keys(store); let jamo=0, syl=0;
+    keys.forEach(k=>{ if(k.indexOf('syl-')===0) syl++; else jamo++; });
+    const total=jamo+syl;
+    const est=Math.max(5,Math.round(total*0.45+6));
+    document.getElementById('f-stats').innerHTML=
+     '<div class="stat"><span>자모 글리프</span><b>'+jamo+' <i>/ 67</i></b></div>'+
+     '<div class="stat"><span>음절 글리프</span><b>'+syl+'</b></div>'+
+     '<div class="stat"><span>총 글리프 (+notdef)</span><b>'+(total+1)+'</b></div>'+
+     '<div class="stat"><span>상용 2,350 커버</span><b>'+Math.min(100,(syl/2350*100)).toFixed(1)+'<i>%</i></b></div>'+
+     '<div class="stat"><span>예상 용량</span><b>~'+est+' <i>KB</i></b></div>';
+  }
+
+  // dataURL bitmap -> ImageTracer black layer
+  function bitmapToPaths(dataURL, RES, th, opts){
+    return new Promise(res=>{
+      const img=new Image();
+      img.onload=()=>{
+        const c=document.createElement('canvas'); c.width=RES; c.height=RES;
+        const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,RES,RES); x.drawImage(img,0,0,RES,RES);
+        const id=x.getImageData(0,0,RES,RES), d=id.data;
+        for(let i=0;i<d.length;i+=4){
+          const lum=0.3*d[i]+0.59*d[i+1]+0.11*d[i+2];
+          const v=(lum<th)?0:255; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255;
+        }
+        let td; try{ td=ImageTracer.imagedataToTracedata(id, opts); }catch(e){ res([]); return; }
+        res((td.layers&&td.layers[1])||[]);
+      };
+      img.onerror=()=>res([]); img.src=dataURL;
+    });
+  }
+
+  // ImageTracer layer -> opentype.Path (flip Y, fit into em box, fix hole winding)
+  function layerToOpenType(layer, UPM, asc, fill, RES, holeFix){
+    const p=new opentype.Path();
+    const m=UPM*(1-fill)/2, s=UPM*fill/RES;
+    const TX=px=> m + px*s, TY=py=> (asc - m) - py*s;
+    for(const pa of layer){
+      const segs=pa.segments; if(!segs||!segs.length) continue;
+      if(holeFix && pa.isholepath){
+        const last=segs[segs.length-1];
+        p.moveTo(TX(last.type==='L'?last.x2:last.x3), TY(last.type==='L'?last.y2:last.y3));
+        for(let i=segs.length-1;i>=0;i--){ const g=segs[i];
+          if(g.type==='L') p.lineTo(TX(g.x1),TY(g.y1));
+          else p.quadTo(TX(g.x2),TY(g.y2),TX(g.x1),TY(g.y1)); }
+      } else {
+        p.moveTo(TX(segs[0].x1),TY(segs[0].y1));
+        for(const g of segs){
+          if(g.type==='L') p.lineTo(TX(g.x2),TY(g.y2));
+          else p.quadTo(TX(g.x2),TY(g.y2),TX(g.x3),TY(g.y3)); }
+      }
+      p.close();
+    }
+    return p;
+  }
+
+  function applyPreview(){
+    const stage=document.getElementById('prev-stage');
+    stage.classList.remove('empty');
+    stage.style.fontFamily='HFGPreview, '+'"Gowun Batang", serif';
+    stage.textContent=document.getElementById('prev-text').value || '미리보기';
+  }
+  document.getElementById('prev-text').oninput=()=>{ const s=document.getElementById('prev-stage'); if(!s.classList.contains('empty')) s.textContent=document.getElementById('prev-text').value; };
+
+  async function buildFont(download){
+    if(typeof opentype==='undefined' || typeof ImageTracer==='undefined'){ toast('라이브러리 로딩 실패 · 네트워크 확인'); return; }
+    const keys=Object.keys(store); if(!keys.length){ toast('그려진 칸이 없습니다'); return; }
+    const UPM=+gv('f-upm')||1000, asc=+gv('f-asc')||880, desc=+gv('f-desc')||-120;
+    const fill=(+gv('f-fill'))/100, th=+gv('f-th'), pathomit=+gv('f-dt');
+    const holeFix=document.getElementById('f-hole').checked, advance=UPM, RES=300;
+    const opts=Object.assign({},TRACE_BASE,{pathomit});
+    const prog=document.getElementById('b-prog');
+    const glyphs=[ new opentype.Glyph({name:'.notdef', advanceWidth:advance, path:new opentype.Path()}) ];
+    const seen={}; let done=0;
+    for(const k of keys){
+      const cp=keyToCp(k); if(cp==null||seen[cp]) continue; seen[cp]=1;
+      prog.textContent='외곽선 추적 중… '+(++done)+'/'+keys.length;
+      await new Promise(r=>setTimeout(r,0)); // let UI paint
+      let layer=[]; try{ layer=await bitmapToPaths(store[k],RES,th,opts);}catch(e){}
+      const path=layerToOpenType(layer,UPM,asc,fill,RES,holeFix);
+      glyphs.push(new opentype.Glyph({ name:'uni'+cp.toString(16).toUpperCase().padStart(4,'0'),
+        unicode:cp, advanceWidth:advance, path }));
+    }
+    let font, buf;
+    try{
+      font=new opentype.Font({ familyName:gv('f-name')||'MyHangul', styleName:'Regular',
+        unitsPerEm:UPM, ascender:asc, descender:desc, glyphs });
+      buf=font.toArrayBuffer();
+    }catch(e){ prog.textContent=''; toast('폰트 조립 오류: '+e.message); return; }
+    lastBuf=buf;
+    const blob=new Blob([buf],{type:'font/otf'});
+    if(lastUrl) URL.revokeObjectURL(lastUrl); lastUrl=URL.createObjectURL(blob);
+    try{ const ff=new FontFace('HFGPreview','url('+lastUrl+')'); await ff.load(); document.fonts.add(ff); applyPreview(); }
+    catch(e){ toast('미리보기 로드 실패(폰트는 생성됨)'); }
+    document.getElementById('b-otf').disabled=false;
+    prog.textContent='완료 · '+(glyphs.length-1)+' 글리프 · ~'+Math.round(buf.byteLength/1024)+'KB';
+    if(download) downloadOtf();
+  }
+  function downloadOtf(){
+    if(!lastUrl){ toast('먼저 폰트를 생성하세요'); return; }
+    const a=document.createElement('a'); a.href=lastUrl; a.download=(gv('f-name')||'MyHangul')+'.otf'; a.click();
+    toast('.OTF 내려받기');
+  }
+
+  // build controls wiring
+  const bind=(id,lab,suf)=>{ const el=document.getElementById(id); el.oninput=()=>document.getElementById(lab).textContent=el.value+(suf||''); };
+  bind('f-fill','f-fillv','%'); bind('f-th','f-thv'); bind('f-dt','f-dtv');
+  document.getElementById('b-build').onclick=()=>buildFont(false);
+  document.getElementById('b-otf').onclick=downloadOtf;
+
+  // init
+  buildPens(); renderJamo(); renderComposer(); renderTypes(); renderBrowseControls(); renderBrowse();
+  // try autoload silently
+  (async()=>{ try{ const r=await window.storage.get(STORAGE_KEY,false); if(r&&r.value){ Object.assign(store,JSON.parse(r.value)); refreshGuides(); } }catch(e){} })();
+})();
+</script>
