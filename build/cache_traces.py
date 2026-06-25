@@ -1,9 +1,7 @@
-import json, pickle, time
+import sys, json, pickle, time
 from vector import trace_png
-meta=json.load(open("meta.json"))
-t0=time.time(); traces={}
-for gid in meta:
-    W,H,cs=trace_png(f"glyphs/{gid}.png")
-    traces[gid]=(W,H,cs)
+src = sys.argv[1] if len(sys.argv)>1 else "glyphs_norm"
+meta=json.load(open("meta.json")); t0=time.time()
+traces={g:trace_png(f"{src}/{g}.png") for g in meta}
 pickle.dump(traces, open("traces.pkl","wb"))
-print("traced", len(traces), "glyphs in %.1fs"%(time.time()-t0))
+print(f"traced {len(traces)} glyphs from {src}/ in {time.time()-t0:.1f}s")

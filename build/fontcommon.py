@@ -20,17 +20,37 @@ def category_for_cp(cp):
     if ('A'<=ch<='Z') or ('a'<=ch<='z') or ('0'<=ch<='9'): return 'alpha'
     return 'symbol'
 
-def em_contours_raw(gid, baseline_box, sb=SB, sx=S, sy=S, x_anchor=None):
-    """Map a glyph's traced contours (image space) into em space.
-       baseline_box -> em y=0 ; left ink edge -> em x=sb."""
+SIZE_BLEND = 0.6     # how strongly to normalise letter sizes toward category targets
+def target_h(gid):
+    m=meta[gid]
+    if m['role']!='uni': return None
+    ch=chr(m['cp'])
+    if ('A'<=ch<='Z') or ('0'<=ch<='9'): return CAP_H
+    if ch in 'acemnorsuvwxz': return X_H
+    if ch in 'bdfhklt': return 720
+    if ch in 'gpqy':    return 720
+    if ch in 'ij':      return 720
+    return None          # symbols: keep natural size
+
+def sizecorr(gid):
+    """Uniform scale that pulls a Latin glyph's height toward its category target."""
+    Ht=target_h(gid)
+    if not Ht: return 1.0
+    nx0,ny0,nx1,ny1=meta[gid]['box_rel']; cur=(ny1-ny0)*S
+    if cur<=1: return 1.0
+    return (1-SIZE_BLEND) + SIZE_BLEND*(Ht/cur)
+
+def em_contours_raw(gid, baseline_box, sb=SB):
+    """Map traced contours into em space (baseline->0, left ink->sb),
+       applying per-category size normalisation (scaled about baseline/left)."""
     W,H,cs = traces[gid]
     nx0,ny0,nx1,ny1 = meta[gid]['box_rel']
     bw,bh = nx1-nx0, ny1-ny0
-    xa = nx0 if x_anchor is None else x_anchor
+    f = sizecorr(gid)
     def conv(px,py):
         box_x = nx0 + (px/W)*bw
         box_y = ny0 + (py/H)*bh
-        return ((box_x-xa)*sx + sb, (baseline_box-box_y)*sy)
+        return ((box_x-nx0)*S*f + sb, (baseline_box-box_y)*S*f)
     out=[]
     for c in cs:
         seg2=[('move',conv(*c[0][1]))]
@@ -39,7 +59,7 @@ def em_contours_raw(gid, baseline_box, sb=SB, sx=S, sy=S, x_anchor=None):
             else:
                 p1,p2,p3=seg[1]; seg2.append(('curve',(conv(*p1),conv(*p2),conv(*p3))))
         out.append(seg2)
-    return out, bw, bh
+    return out, bw*f, bh*f
 
 def baseline_for(gid, category):
     nx0,ny0,nx1,ny1 = meta[gid]['box_rel']

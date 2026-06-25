@@ -5,7 +5,7 @@ Reproduces `SongilHandwriting-Regular.ttf` from the source photos in `raw/`.
 ## Requirements
 
 ```bash
-pip install fonttools pillow numpy skia-pathops
+pip install fonttools pillow numpy scipy skia-pathops
 # potrace binary:
 apt-get install potrace      # Debian/Ubuntu
 # brew install potrace       # macOS
@@ -14,10 +14,15 @@ apt-get install potrace      # Debian/Ubuntu
 ## Run (from this directory)
 
 ```bash
-python3 extract_final.py   # raw/*.jpg  -> glyphs/*.png + meta.json   (cell crop + ink isolation)
-python3 cache_traces.py    # glyphs/    -> traces.pkl                 (potrace vectorisation)
-python3 build_font.py      #            -> SongilHandwriting-Regular.ttf
+python3 extract_final.py        # raw/*.jpg -> glyphs/*.png + meta.json  (cell crop + ink isolation)
+python3 cache_traces.py glyphs  # glyphs/   -> traces.pkl                (needed by the normaliser)
+python3 normalize.py            # glyphs/   -> glyphs_norm/              (even stroke weight)
+python3 cache_traces.py         # glyphs_norm/ -> traces.pkl            (re-trace normalised)
+python3 build_font.py           # -> Lightheaded-Regular.ttf (+ -Latin) (with & without Korean)
 ```
+
+`build_font.py` emits **two** files: `Lightheaded-Regular.ttf` (with Korean) and
+`Lightheaded-Latin-Regular.ttf` (Latin/symbols only).
 
 ## Files
 
@@ -28,7 +33,8 @@ python3 build_font.py      #            -> SongilHandwriting-Regular.ttf
 | `geom_fixed.py` | frozen per-page grid geometry (row centres + column span) |
 | `extract_final.py` | grid crop, ink isolation, neighbour-leak removal, per-glyph metadata |
 | `vector.py` | potrace wrapper + SVG-path parser → Bézier contours |
-| `cache_traces.py` | trace every glyph once into `traces.pkl` |
+| `normalize.py` | even out stroke weight (thin heavy strokes) to a consistent target |
+| `cache_traces.py` | trace every glyph (arg = source dir) into `traces.pkl` |
 | `fontcommon.py` | coordinate mapping (box → em), baseline rules, glyph pens |
 | `hangul.py` | syllable composition: zones for the 6 layout types, jamo placement |
 | `build_font.py` | assemble the TTF (ASCII + base jamo + 11,172 composites) |
