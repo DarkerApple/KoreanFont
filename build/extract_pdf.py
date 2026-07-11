@@ -84,3 +84,38 @@ for gid,role,cp,ch,L in assign:
 json.dump(meta,open("meta.json","w"),ensure_ascii=False)
 print(f"cells assigned={len(assign)} with-ink={nink} empty={sum(1 for r in meta.values() if r['empty'])}")
 print("empty:",[k for k,r in meta.items() if r['empty']])
+
+# ---- post-fix: close the internal gap in mix vowels (ㅘㅙㅚㅝㅞㅟㅢ) ----
+# the drawn right bar sits far from the ㅗ/ㅜ/ㅡ base; pull it in so the bar
+# doesn't float at the end of the syllable.
+def _close_mix_gap(path, maxgap=0.11):
+    im=np.asarray(Image.open(path).convert('L')); ink=im<128
+    H,W=ink.shape
+    cols=ink.any(axis=0)
+    runs=[]; i=0
+    while i<W:
+        if cols[i]:
+            j=i
+            while j<W and cols[j]: j+=1
+            runs.append((i,j)); i=j
+        else: i+=1
+    if len(runs)<2: return False
+    gaps=[(runs[k+1][0]-runs[k][1],k) for k in range(len(runs)-1)]
+    g,k=max(gaps)
+    if g <= maxgap*W: return False
+    newg=int(maxgap*W)
+    shift=g-newg
+    cut=runs[k][1]
+    out=np.zeros((H,W-shift),bool)
+    out[:, :cut]=ink[:, :cut]
+    out[:, cut+newg- (runs[k+1][0]-cut-shift) if False else cut:]=False
+    right=ink[:, runs[k+1][0]:]
+    out[:, runs[k+1][0]-shift:runs[k+1][0]-shift+right.shape[1]]|=right
+    Image.fromarray(np.where(out,0,255).astype(np.uint8)).save(path)
+    return True
+
+if __name__=='__main__' or True:
+    for i in (9,10,11,14,15,16,19):     # ㅘㅙㅚㅝㅞㅟㅢ
+        p=f"glyphs/jung{i:02d}.png"
+        if os.path.exists(p):
+            print("mix-gap fix", p, _close_mix_gap(p))

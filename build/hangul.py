@@ -24,9 +24,9 @@ def zones(jung, has_jong):
         return dict(cho=(.02,.02,.43,.46), jung=(.05,.03,.93,.95))   # mix
     else:
         # batchim band sits close under the body
-        if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.54), jong=(.06,.575,.88,.385))
-        if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.405,.92,.20), jong=(.06,.62,.88,.35))
-        return dict(cho=(.02,.02,.42,.38), jung=(.27,.02,.71,.57), jong=(.06,.60,.88,.375))  # mix
+        if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.54), jong=(.06,.56,.88,.385))
+        if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.40,.92,.20), jong=(.06,.605,.88,.35))
+        return dict(cho=(.02,.02,.42,.38), jung=(.27,.02,.71,.57), jong=(.06,.585,.88,.375))  # mix
 
 # per-role fill factor and alignment (ax,ay in 0..1; .5=center)
 ROLE_FIT={'cho':0.96,'jung':0.96,'jong':1.0}
@@ -156,7 +156,7 @@ def align_for(role, vt):
         if vt=='vert': return (0.85,0.5)     # bar toward the right edge (commercial)
         if vt=='horz': return (0.5,0.6)
         return (0.72,0.55)
-    return (0.5,0.38) # jong: hug the body above
+    return (0.5,0.28) # jong: hug the body above
 
 # 0-based indices into JONG that are two-consonant clusters (wide finals)
 COMPOUND_JONG={2,4,5,8,9,10,11,12,13,14,17}
@@ -180,7 +180,7 @@ def compose(cho_i, jung_i, jong_full):
             cs.append(seg2)
     return cs
 
-COUPLE=125            # gap between cho ink and a vertical vowel bar (em)
+COUPLE=90             # gap between cho ink and a vertical vowel bar (em)
 
 def _ink_span(comps):
     xs=[]
