@@ -2,7 +2,7 @@ import json, numpy as np, os
 from PIL import Image
 from scipy import ndimage
 import hangul
-from fontcommon import S, sizecorr
+from fontcommon import S, eff_f
 meta=json.load(open("meta.json"))
 OUT="glyphs_norm"; os.makedirs(OUT, exist_ok=True)
 T_EM=85.0     # target final rendered stroke width (em)
@@ -26,7 +26,7 @@ def target_px(gid):
     W,H=Image.open(f"glyphs/{gid}.png").size
     if m['role']=='uni':
         boxperpx=(ny1-ny0)/H
-        f=sizecorr(gid)                      # size-normalisation also scales the stroke
+        f=eff_f(gid)                         # size-normalisation also scales the stroke
         return (T_EM/(boxperpx*S*f))/2.0     # half-width px
     base="jamo_"+gid; s=sref.get(base,0.5)
     return ((T_EM/s)*H/1000.0)/2.0           # half-width px

@@ -1,11 +1,11 @@
 # Build pipeline
 
-Reproduces `SongilHandwriting-Regular.ttf` from the source photos in `raw/`.
+Reproduces the Lightheaded fonts from the source photos in `raw/`.
 
 ## Requirements
 
 ```bash
-pip install fonttools pillow numpy scipy skia-pathops
+pip install fonttools pillow numpy scipy skia-pathops compreffor
 # potrace binary:
 apt-get install potrace      # Debian/Ubuntu
 # brew install potrace       # macOS
@@ -19,6 +19,7 @@ python3 cache_traces.py glyphs  # glyphs/   -> traces.pkl                (needed
 python3 normalize.py            # glyphs/   -> glyphs_norm/              (even stroke weight)
 python3 cache_traces.py         # glyphs_norm/ -> traces.pkl            (re-trace normalised)
 python3 build_font.py           # -> Lightheaded-Regular.ttf (+ -Latin) (with & without Korean)
+python3 make_otf.py             # -> .otf versions (CFF; then subroutinised with compreffor)
 ```
 
 `build_font.py` emits **two** files: `Lightheaded-Regular.ttf` (with Korean) and

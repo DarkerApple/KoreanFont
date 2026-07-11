@@ -5,10 +5,10 @@ JUNG=['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','�
 JONG=['ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
 VERT={0,1,2,3,4,5,6,7,20}; HORZ={8,12,13,17,18}; MIX={9,10,11,14,15,16,19}
 
-# Syllable design square in em (baseline y=0)
-SQ_L, SQ_R, SQ_B, SQ_T = 70, 945, -40, 845
+# Syllable design square in em (baseline y=0) — compact
+SQ_L, SQ_R, SQ_B, SQ_T = 55, 865, -48, 858
 SQW, SQH = SQ_R-SQ_L, SQ_T-SQ_B
-ADV = 1000
+ADV = 915
 
 def vtype(j): return 'vert' if j in VERT else ('horz' if j in HORZ else 'mix')
 
@@ -25,10 +25,18 @@ def zones(jung, has_jong):
         return dict(cho=(.02,.02,.40,.42), jung=(.27,.02,.71,.63), jong=(.12,.69,.76,.29))  # mix
 
 # per-role fill factor and alignment (ax,ay in 0..1; .5=center)
-ROLE_FIT={'cho':0.90,'jung':0.92,'jong':0.93}
+ROLE_FIT={'cho':0.95,'jung':0.95,'jong':0.95}
+
+def optical_fill(gid, fill):
+    """Adapt each jamo's size to its complexity: simple consonants (ㄱㄴㅅ…)
+    slightly smaller, complex ones (ㅃㅄ…) use the full zone."""
+    if gid.startswith('jung'): return fill
+    n=len(traces[gid][2])          # traced contour count = stroke complexity
+    return fill*(0.90 if n<=1 else 0.96 if n==2 else 1.0)
 
 def placement(gid, zone, fill, align):
     """Return (sc, x0, yTop, W, H): scale (px->em) and top-left anchor in em."""
+    fill=optical_fill(gid, fill)
     W,H,cs=traces[gid]
     zx,zy,zw,zh=zone
     zL=SQ_L+zx*SQW; zR=SQ_L+(zx+zw)*SQW

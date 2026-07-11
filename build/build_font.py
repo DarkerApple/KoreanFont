@@ -8,14 +8,25 @@ import hangul
 VERSION="1.000"
 
 def make_comp(components):
+    """Composite glyph; bakes the global SLANT in (shear about baseline y=0)."""
     g=Glyph(); g.numberOfContours=-1; g.components=[]
     for name,scale,dx,dy in components:
         c=GlyphComponent(); c.glyphName=name
-        c.x=int(round(dx)); c.y=int(round(dy))
-        c.flags=0x0002                       # ARGS_ARE_XY_VALUES (scale flag added by compiler)
-        c.transform=[[float(scale),0.0],[0.0,float(scale)]]
+        c.x=int(round(dx+SLANT*dy)); c.y=int(round(dy))
+        c.flags=0x0002                       # ARGS_ARE_XY_VALUES
+        c.transform=[[float(scale),float(SLANT*scale)],[0.0,float(scale)]]
         g.components.append(c)
     return g
+
+def shear(cs, s=SLANT):
+    sh=lambda p:(p[0]+s*p[1], p[1])
+    out=[]
+    for c in cs:
+        o=[(c[0][0], sh(c[0][1]))]
+        for seg in c[1:]:
+            o.append((seg[0], sh(seg[1]) if seg[0]=='line' else tuple(sh(p) for p in seg[1])))
+        out.append(o)
+    return out
 
 def build(family, out, include_korean):
     t0=time.time()
@@ -38,18 +49,18 @@ def build(family, out, include_korean):
         nm="uni%04X"%cp; glyphs[nm]=glyph_from_em(contours); hmtx[nm]=(adv,lsb)
         cmap[cp]=nm; order.append(nm); simple.add(nm)
     def rect(x0,y0,x1,y1): return [('move',(x0,y0)),('line',(x1,y0)),('line',(x1,y1)),('line',(x0,y1))]
-    add_simple(0x7C, [rect(0,-90,82,700)], 82+2*SB)
-    add_simple(0x5E, [[('move',(150,690)),('line',(280,470)),('line',(232,470)),
-                       ('line',(150,610)),('line',(68,470)),('line',(20,470))]], 300+2*SB)
-    s_em,sbw,_=em_contours_raw("uni0053", baseline_for("uni0053","alpha"))
+    add_simple(0x7C, shear([rect(0,-90,76,700)]), 76+2*SB)
+    add_simple(0x5E, shear([[('move',(150,690)),('line',(280,470)),('line',(232,470)),
+                       ('line',(150,610)),('line',(68,470)),('line',(20,470))]]), 300+2*SB)
+    s_em,sbw,_=em_contours_raw("uni0053", baseline_for("uni0053","alpha"))   # already sheared
     xs=[q[0] for c in s_em for p in c for q in ([p[1]] if p[0]!='curve' else [p[1][2]])]
     scx=(min(xs)+max(xs))/2
-    add_simple(0x24, s_em+[rect(scx-26,-70,scx+26,760)], int(round(sbw*S+2*SB)))
+    add_simple(0x24, s_em+shear([rect(scx-26,-70,scx+26,760)]), int(round(sbw*S+2*SB)))
     hy_em,_,_=em_contours_raw("uni002D", baseline_for("uni002D","symbol"))
     hys=[q[1] for c in hy_em for p in c for q in ([p[1]] if p[0]!='curve' else [p[1][2]])]
     hymid=(min(hys)+max(hys))/2; hyth=max(56,(max(hys)-min(hys)))
-    add_simple(0x2013, [rect(40,hymid-hyth/2,500,hymid+hyth/2)], 540)
-    add_simple(0x2014, [rect(20,hymid-hyth/2,840,hymid+hyth/2)], 880)
+    add_simple(0x2013, shear([rect(40,hymid-hyth/2,500,hymid+hyth/2)]), 540)
+    add_simple(0x2014, shear([rect(20,hymid-hyth/2,840,hymid+hyth/2)]), 880)
 
     def add_comp(cp, comps, adv):
         nm="uni%04X"%cp; glyphs[nm]=make_comp(comps); hmtx[nm]=(adv,0)

@@ -4,10 +4,12 @@ A light, even-weight **handwriting font built from hand-drawn templates** —
 Korean (한글), Latin, digits and symbols — generated automatically from photos
 of filled-in jamo/ASCII template sheets.
 
-| Download | Coverage | Size |
+| Download | Coverage | Format |
 |---|---|---|
-| **[`Lightheaded-Regular.ttf`](Lightheaded-Regular.ttf)** | Korean + Latin + symbols | ≈0.58 MB |
-| **[`Lightheaded-Latin-Regular.ttf`](Lightheaded-Latin-Regular.ttf)** | Latin + symbols only (no Korean) | ≈0.04 MB |
+| **[`Lightheaded-Regular.ttf`](Lightheaded-Regular.ttf)** | Korean + Latin + symbols | TrueType (recommended, ≈0.8 MB) |
+| **[`Lightheaded-Regular.otf`](Lightheaded-Regular.otf)** | Korean + Latin + symbols | OpenType/CFF |
+| **[`Lightheaded-Latin-Regular.ttf`](Lightheaded-Latin-Regular.ttf)** | Latin + symbols only | TrueType (≈0.04 MB) |
+| **[`Lightheaded-Latin-Regular.otf`](Lightheaded-Latin-Regular.otf)** | Latin + symbols only | OpenType/CFF |
 
 ![paragraph sample](samples/paragraph.png)
 
@@ -35,8 +37,11 @@ The font is tuned for an even, *lightheaded* look:
 
 - **Stroke weight** normalised to a consistent ~85 em across Korean and Latin
   (the heavy marker strokes were thinned to match).
-- **Letter sizes** pulled toward consistent cap-height / x-height per category.
-- **Spacing** uses uniform side bearings; Korean syllables are fixed-width.
+- **Letter sizes** pulled toward consistent cap-height / x-height per category
+  (with descender bowls sized to x-height and over-wide letters width-capped).
+- **Consistent forward tilt** matching the natural lean of the handwriting.
+- **Compact spacing** — tight side bearings; Korean uses a compact
+  fixed-width syllable block with complexity-adaptive jamo sizing.
 
 ![consistency](samples/consistency.png)
 
