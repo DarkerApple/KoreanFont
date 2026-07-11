@@ -76,12 +76,14 @@ def build(family, out, include_korean):
 
     nsyl=0; ncompat=0
     if include_korean:
-        # base jamo (simple, cleaned)
-        for role,n in (("cho",19),("jung",21),("jong",27)):
-            for i in range(n):
-                gid="%s%02d"%(role,i); nm=hangul.base_name(gid)
-                glyphs[nm]=glyph_from_em(hangul.base_contours(gid)); hmtx[nm]=(1000,0)
-                order.append(nm); simple.add(nm)
+        # base jamo (simple, cleaned); cho/jung carry L/S weight variants
+        basegids=[f"{r}{i:02d}{v}" for r,n in (("cho",19),("jung",21))
+                  for i in range(n) for v in ("_L","_S")]
+        basegids+=["jong%02d"%i for i in range(27)]
+        for gid in basegids:
+            nm=hangul.base_name(gid)
+            glyphs[nm]=glyph_from_em(hangul.base_contours(gid)); hmtx[nm]=(1000,0)
+            order.append(nm); simple.add(nm)
         # 11,172 syllables (composites)
         for ci in range(19):
             for ji in range(21):

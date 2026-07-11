@@ -7,7 +7,7 @@ of filled-in jamo/ASCII template sheets.
 | Download | Coverage | Format |
 |---|---|---|
 | **[`Lightheaded-Regular.ttf`](Lightheaded-Regular.ttf)** | Korean + Latin + symbols | TrueType (recommended, ≈0.8 MB) |
-| **[`Lightheaded-Regular.otf`](Lightheaded-Regular.otf)** | Korean + Latin + symbols | OpenType/CFF |
+| **[`Lightheaded-Regular.otf`](Lightheaded-Regular.otf)** | Korean + Latin + symbols | OpenType/CFF (≈20 MB — CFF can't share composed syllables; prefer the TTF) |
 | **[`Lightheaded-Latin-Regular.ttf`](Lightheaded-Latin-Regular.ttf)** | Latin + symbols only | TrueType (≈0.04 MB) |
 | **[`Lightheaded-Latin-Regular.otf`](Lightheaded-Latin-Regular.otf)** | Latin + symbols only | OpenType/CFF |
 
@@ -35,8 +35,9 @@ only need English/symbols, or want a tiny file.
 
 The font is tuned for an even, *lightheaded* look:
 
-- **Stroke weight** normalised to a consistent ~85 em across Korean and Latin
-  (the heavy marker strokes were thinned to match).
+- **Stroke weight** matched at ~85 em across Korean and Latin. Each cho/jung
+  jamo carries two weight variants (large placements vs batchim placements) so
+  syllables with and without finals render at the same optical weight.
 - **Letter sizes** pulled toward consistent cap-height / x-height per category
   (with descender bowls sized to x-height and over-wide letters width-capped).
 - **Consistent forward tilt** matching the natural lean of the handwriting.

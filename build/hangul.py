@@ -27,17 +27,22 @@ def zones(jung, has_jong):
 # per-role fill factor and alignment (ax,ay in 0..1; .5=center)
 ROLE_FIT={'cho':0.95,'jung':0.95,'jong':0.95}
 
+def T(gid):
+    """Trace lookup with fallback to the un-suffixed jamo (first pipeline pass)."""
+    if gid in traces: return traces[gid]
+    return traces[gid.replace('_L','').replace('_S','')]
+
 def optical_fill(gid, fill):
     """Adapt each jamo's size to its complexity: simple consonants (ㄱㄴㅅ…)
     slightly smaller, complex ones (ㅃㅄ…) use the full zone."""
     if gid.startswith('jung'): return fill
-    n=len(traces[gid][2])          # traced contour count = stroke complexity
+    n=len(T(gid)[2])               # traced contour count = stroke complexity
     return fill*(0.90 if n<=1 else 0.96 if n==2 else 1.0)
 
 def placement(gid, zone, fill, align):
     """Return (sc, x0, yTop, W, H): scale (px->em) and top-left anchor in em."""
     fill=optical_fill(gid, fill)
-    W,H,cs=traces[gid]
+    W,H,cs=T(gid)
     zx,zy,zw,zh=zone
     zL=SQ_L+zx*SQW; zR=SQ_L+(zx+zw)*SQW
     zTop=SQ_T-zy*SQH; zBot=SQ_T-(zy+zh)*SQH
@@ -51,7 +56,7 @@ def placement(gid, zone, fill, align):
 
 def place(gid, zone, fill, align):
     sc,x0,yTop,W,H=placement(gid,zone,fill,align)
-    _,_,cs=traces[gid]
+    _,_,cs=T(gid)
     def conv(px,py): return (x0+px*sc, yTop-py*sc)
     out=[]
     for c in cs:
@@ -65,7 +70,7 @@ def place(gid, zone, fill, align):
 
 # --- base jamo glyph (normalised: ink height=1000, bottom at 0, left at 0) ---
 def base_contours(gid):
-    W,H,cs=traces[gid]; K=1000.0/H
+    W,H,cs=T(gid); K=1000.0/H
     def conv(px,py): return (px*K, (H-py)*K)
     out=[]
     for c in cs:
@@ -107,10 +112,11 @@ def jong_zone(j0, base):
 
 def compose(cho_i, jung_i, jong_full):
     has=jong_full>0
+    v="_S" if has else "_L"                 # weight variant per context
     z=zones(jung_i, has); vt=vtype(jung_i)
     cs=[]
-    cs+=place("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt))
-    cs+=place("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
+    cs+=place("cho%02d"%cho_i+v, z['cho'], ROLE_FIT['cho'], align_for('cho',vt))
+    cs+=place("jung%02d"%jung_i+v, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
     if has:
         jz=jong_zone(jong_full-1, z['jong'])
         cs+=place("jong%02d"%(jong_full-1), jz, ROLE_FIT['jong'], align_for('jong',vt))
@@ -118,9 +124,10 @@ def compose(cho_i, jung_i, jong_full):
 
 def compose_components(cho_i, jung_i, jong_full):
     has=jong_full>0
+    v="_S" if has else "_L"                 # weight variant per context
     z=zones(jung_i, has); vt=vtype(jung_i)
-    comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt)),
-           component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))]
+    comps=[component("cho%02d"%cho_i+v, z['cho'], ROLE_FIT['cho'], align_for('cho',vt)),
+           component("jung%02d"%jung_i+v, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))]
     if has:
         jz=jong_zone(jong_full-1, z['jong'])
         comps.append(component("jong%02d"%(jong_full-1), jz, ROLE_FIT['jong'], align_for('jong',vt)))
@@ -128,6 +135,7 @@ def compose_components(cho_i, jung_i, jong_full):
 
 # standalone jamo (for compatibility-jamo codepoints): centred in the square
 def standalone_component(gid):
+    if gid.startswith(('cho','jung')): gid=gid+"_L"
     return component(gid, (.12,.06,.76,.88), 0.90, (0.5,0.5))
 
 def syl_code(ci,ji,ki): return 0xAC00 + (ci*21+ji)*28 + ki

@@ -35,10 +35,12 @@ def to_otf(src, dst):
         sxHeight=o.sxHeight,sCapHeight=o.sCapHeight,achVendID=o.achVendID,fsType=o.fsType)
     fb.setupPost()
     fb.font['head'].fontRevision=f['head'].fontRevision
-    try:
-        from compreffor import compress; compress(fb.font)   # CFF subroutinisation
-    except Exception as e:
-        print("  (compreffor skipped:",e,")")
+    import os
+    if not os.environ.get("LH_NO_COMPRESS"):
+        try:
+            from compreffor import compress; compress(fb.font)   # CFF subroutinisation
+        except Exception as e:
+            print("  (compreffor skipped:",e,")")
     fb.font.save(dst)
     import os; print(f"{dst}: {len(order)} glyphs {os.path.getsize(dst)/1e6:.2f}MB {time.time()-t0:.1f}s")
 
