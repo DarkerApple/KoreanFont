@@ -2,6 +2,7 @@
 import json as _json, os as _os, re as _re
 from fontcommon import traces, meta
 _B=_json.load(open("buckets.json")) if _os.path.exists("buckets.json") else {}
+_PROF=_json.load(open("profiles.json")) if _os.path.exists("profiles.json") else {}
 CHO =['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
 JUNG=['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ']
 JONG=['ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
@@ -231,7 +232,7 @@ def compose(cho_i, jung_i, jong_full):
             cs.append(seg2)
     return cs
 
-COUPLE=90             # gap between cho ink and a vertical vowel bar (em)
+COUPLE=70             # 2-D ink clearance between body and a vertical vowel bar (em)
 
 def _ink_span(comps):
     xs=[]
@@ -241,6 +242,43 @@ def _ink_span(comps):
         xs.append(dx); xs.append(dx + W*(1000.0/H)*bx)
     return min(xs), max(xs)
 
+def _prof(gid):
+    """Edge profile with the same fallback chain as T()."""
+    if gid in _PROF: return _PROF[gid]
+    base=_re.sub(r'_\d+$','',gid)
+    return _PROF.get(base) or _PROF.get('raw_'+base)
+
+def _couple2d(comps, bar_gid, bar_w, bar_bot, bar_top, gap):
+    """Leftmost bar x giving >=gap true 2-D clearance from every placed
+    component — lets vowel arms (ㅕㅔ…) tuck into the notch of the initial
+    (commercial behaviour) instead of clearing its whole bounding box."""
+    pb=_prof(bar_gid)
+    if pb is None or not comps:
+        return _spans(comps)[1]+gap if comps else SQ_L
+    NBp=len(pb['L']); lo=-1e9
+    spans=[]
+    for c in comps:
+        name,bx,by,dx,dy=c
+        gid=name.replace('jamo_','')
+        W,H,_=T(gid)
+        spans.append((_prof(gid), dx, dy, W*(1000.0/H)*bx, 1000.0*by))
+    for s in range(64):
+        y=bar_bot+(s+0.5)/64.0*(bar_top-bar_bot)
+        bi=min(NBp-1, max(0, int((bar_top-y)/(bar_top-bar_bot)*NBp)))
+        bl=pb['L'][bi]
+        if bl is None: continue
+        for pc,cx,cy,cw,chh in spans:
+            if not (cy<=y<=cy+chh): continue
+            if pc is not None:
+                ci=min(len(pc['R'])-1, max(0, int((cy+chh-y)/chh*len(pc['R']))))
+                cr=pc['R'][ci]
+                if cr is None: continue
+                cr=cx+cr*cw
+            else:
+                cr=cx+cw
+            lo=max(lo, cr+gap-bl*bar_w)
+    return lo if lo>-1e8 else _spans(comps)[1]+gap
+
 def compose_components(cho_i, jung_i, jong_full):
     has=jong_full>0
     z=zones(jung_i, has); vt=vtype(jung_i)
@@ -249,12 +287,14 @@ def compose_components(cho_i, jung_i, jong_full):
     elif vt=='vert':
         comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt))]
         jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
-        _,cmaxx,_,_=_spans(comps)
         name,bx,by,dx,dy=jc
         gid=name.replace('jamo_',''); W,H,_=T(gid)
         jw=W*(1000.0/H)*bx
-        BAR_MIN=SQ_L+0.72*SQW
-        nx=min(max(cmaxx+COUPLE, BAR_MIN), SQ_R-jw)
+        lo=_couple2d(comps, gid, jw, dy, dy+1000.0*by, COUPLE)
+        # floor: block stays wide enough for the width normaliser, but a
+        # thin ㅣ bar never gets pushed out just to fill the square
+        BAR_MIN=min(_spans(comps)[0]+(0.90*SQW)/1.08-jw, SQ_L+0.62*SQW)
+        nx=min(max(lo, BAR_MIN), SQ_R-jw)
         comps.append((name,bx,by,nx,dy))
         if has:
             comps.append(component("jong%02d"%(jong_full-1),
@@ -263,7 +303,7 @@ def compose_components(cho_i, jung_i, jong_full):
         jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
         _,_,jb,jt=comp_span(jc)
         top=SQ_T-.02*SQH
-        cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt-15, SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
+        cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt+52, SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
         comps=[cho,jc]
         if has:
             comps.append(component("jong%02d"%(jong_full-1),
@@ -297,8 +337,8 @@ def _compose_mix(cho_i, jung_i, jong_full, has):
                          jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong','mix')))
         return comps
     # vertical budget (fractions of SQH, from the top)
-    if has: cho_h, base_h, jong_y = .40, .175, .615
-    else:   cho_h, base_h, jong_y = .46, .21, None
+    if has: cho_h, base_h, jong_y = .37, .16, .615
+    else:   cho_h, base_h, jong_y = .44, .21, None
     top=SQ_T-.02*SQH
     # initial: top-left, free fill
     cho=fit_box("cho%02d"%cho_i, SQ_L+.02*SQW, top-cho_h*SQH, SQ_L+.56*SQW, top, ax=0.35, ay=0.4)
@@ -307,11 +347,10 @@ def _compose_mix(cho_i, jung_i, jong_full, has):
     # base: width follows the initial (stem tucked inside its footprint)
     bw=(cr-cl)*1.12
     bx0=max(SQ_L+.01*SQW, cl-(bw-(cr-cl))/2.0)
-    btop=cb+14                                           # slight tuck under the cho
+    btop=cb-40                                           # small gap under the cho
     base=fit_box(gb, bx0, btop-base_h*SQH, bx0+bw, btop)
     comps.append(base)
-    # bar: right, coupled with floor, spanning the body height
-    _,bmax,_,_=_spans(comps)
+    # bar: right, 2-D coupled with floor, spanning the body height
     bar_top=top
     bar_bot=(SQ_T-(jong_y-.02)*SQH) if has else (SQ_B+18)
     W,H=raw_dims(gr); wu=W*1000.0/H
@@ -320,13 +359,22 @@ def _compose_mix(cho_i, jung_i, jong_full, has):
     vg=select_by(gr,bxs,by)
     Wv,Hv,_=T(vg); wuv=Wv*1000.0/Hv
     jw=wuv*bxs
-    BAR_MIN=SQ_L+0.72*SQW
-    nx=min(max(bmax+COUPLE, BAR_MIN), SQ_R-jw)
+    lo=_couple2d(comps, vg, jw, bar_bot, bar_top, COUPLE)
+    BAR_MIN=min(_spans(comps)[0]+(0.90*SQW)/1.08-jw, SQ_L+0.62*SQW)
+    nx=min(max(lo, BAR_MIN), SQ_R-jw)
     comps.append((base_name(vg), bxs, by, nx, bar_bot))
     if has:
         z=zones(jung_i, True)
-        comps.append(component("jong%02d"%(jong_full-1),
-                     jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong','mix')))
+        jcomp=component("jong%02d"%(jong_full-1),
+                        jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong','mix'))
+        # clearance guard: keep the final below the vowel base
+        jl,jr,jb,jt2=comp_span(jcomp)
+        _,_,bb_,_=comp_span(base); bl_,br_,_,_=comp_span(base)
+        if jr>bl_ and br_>jl and jt2>bb_-28:
+            shift=min(jt2-(bb_-28), jb-SQ_B)
+            if shift>0:
+                jcomp=(jcomp[0],jcomp[1],jcomp[2],jcomp[3],jcomp[4]-shift)
+        comps.append(jcomp)
     return comps
 
 # standalone jamo (for compatibility-jamo codepoints): centred in the square

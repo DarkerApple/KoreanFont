@@ -11,9 +11,9 @@ T_EM=80.0        # target final rendered stroke width (em)
 GID_BOOST={}     # directional targeting handles ㅟ/ㅢ now
 MAX_DILATE=9.0
 PAD=12
-SPAN=1.16        # scale bucket max span
-RSPAN=1.10       # ratio bucket max span
-MAXK=30
+SPAN=1.10        # scale bucket max span
+RSPAN=1.07       # ratio bucket max span
+MAXK=40
 
 # ---- collect every placement (scale, anisotropy) per jamo ----
 pl={}
@@ -86,7 +86,7 @@ def bounded_gap(fg):
 def adjust_iso(fg0, th):
     """Erode/dilate isotropically to stroke half-width th (px), guarding fusion."""
     fg0=np.pad(fg0,PAD)
-    cap=max(8.0, 0.42*bounded_gap(fg0))
+    cap=max(9.0, 0.45*bounded_gap(fg0))
     dt_in=ndimage.distance_transform_edt(fg0)
     dt_out=ndimage.distance_transform_edt(~fg0)
     c=0.0; cur=fg0

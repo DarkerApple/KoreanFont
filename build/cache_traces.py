@@ -27,3 +27,27 @@ for p in sorted(glob.glob("glyphs/*.png")):     # raw geometry for variant selec
     traces["raw_"+os.path.splitext(os.path.basename(p))[0]]=trace_png(p)
 pickle.dump(traces, open("traces.pkl","wb"))
 print(f"traced {len(traces)} entries from {src}/ (+raw) in {time.time()-t0:.1f}s")
+
+# ---- ink edge profiles (per-band L/R extents, for 2-D clearance coupling) ----
+import json
+NB=24
+def profile(p):
+    a=np.asarray(Image.open(p).convert('L'))<128
+    H,W=a.shape
+    L=[];R=[]
+    for b in range(NB):
+        y0=int(b*H/NB); y1=max(y0+1,int((b+1)*H/NB))
+        band=a[y0:y1]
+        if band.any():
+            xs=np.where(band.any(axis=0))[0]
+            L.append(round(float(xs.min())/W,4)); R.append(round(float(xs.max()+1)/W,4))
+        else:
+            L.append(None); R.append(None)
+    return dict(L=L,R=R)
+profs={}
+for p in sorted(glob.glob(f"{src}/*.png")):
+    profs[os.path.splitext(os.path.basename(p))[0]]=profile(p)
+for p in sorted(glob.glob("glyphs/*.png")):
+    profs["raw_"+os.path.splitext(os.path.basename(p))[0]]=profile(p)
+json.dump(profs, open("profiles.json","w"))
+print(f"profiled {len(profs)} bitmaps")
