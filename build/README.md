@@ -14,7 +14,9 @@ apt-get install potrace      # Debian/Ubuntu
 ## Run (from this directory)
 
 ```bash
-python3 extract_final.py        # raw/*.jpg -> glyphs/*.png + meta.json  (cell crop + ink isolation)
+# v2 source (current): the digitally drawn worksheet PDF
+python3 extract_pdf.py          # raw/LightheadedRAW.pdf -> glyphs/*.png + meta.json
+# (v1 alternative: extract_final.py works from the raw/*.jpg photo scans)
 python3 cache_traces.py glyphs  # glyphs/   -> traces.pkl                (needed by the normaliser)
 python3 normalize.py            # glyphs/   -> glyphs_norm/              (even stroke weight)
 python3 cache_traces.py         # glyphs_norm/ -> traces.pkl            (re-trace normalised)
@@ -29,7 +31,9 @@ python3 make_otf.py             # -> .otf versions (CFF; then subroutinised with
 
 | File | Role |
 |---|---|
-| `raw/img00…09.jpg` | the 10 filled-in template photos (jamo ×4, ASCII ×6) |
+| `raw/LightheadedRAW.pdf` | v2 worksheet (tablet-drawn, current source) |
+| `raw/img00…09.jpg` | v1: the 10 template photos |
+| `extract_pdf.py` | v2 extractor: locate cells via the PDF text labels, keep black ink |
 | `spec.py` | logical layout of every page → which glyph is in which cell |
 | `geom_fixed.py` | frozen per-page grid geometry (row centres + column span) |
 | `extract_final.py` | grid crop, ink isolation, neighbour-leak removal, per-glyph metadata |

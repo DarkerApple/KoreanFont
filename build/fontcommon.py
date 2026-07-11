@@ -4,10 +4,10 @@ from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.pens.cu2quPen import Cu2QuPen
 
 UPM   = 1000
-S     = 2000.0      # em units per box-unit (cap height ~700)
+S     = 1736.0      # em units per box-unit (cap 0.403 box -> 700em, v2 worksheet)
 SB    = 50          # default side bearing (em) — compact spacing
-B0    = 0.71        # global baseline in box coords (used for symbols)
-DESC_DEPTH = 0.10   # descender depth in box units
+B0    = 0.672       # global baseline in box coords (v2 worksheet)
+DESC_DEPTH = 0.122  # descender depth in box units (v2)
 DESCSET = set('gjpqy')
 CAP_H, X_H, ASC, DESC = 700, 500, 880, -290
 SLANT = 0.028       # gentle forward tilt (~1.6deg) (x += SLANT*y about baseline)

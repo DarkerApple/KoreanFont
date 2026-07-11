@@ -45,7 +45,7 @@ def build(family, out, include_korean):
         name="uni%04X"%cp; glyphs[name]=glyph_from_em(em)
         hmtx[name]=(int(round(bw*S+2*SB)), SB); cmap[cp]=name
         order.append(name); simple.add(name)
-    if 0x5C in cmap: cmap[0x20A9]=cmap[0x5C]     # ₩ won == drawn backslash glyph
+
 
     # ---- tabular digits: uniform advance, each digit centred ----
     dws={}
@@ -65,16 +65,28 @@ def build(family, out, include_korean):
 
     # ---- synthesize $ ^ | and en/em dashes ----
     def add_simple(cp, contours, adv, lsb=SB):
+        if cp in cmap: return                    # a drawn glyph wins over synthetics
         nm="uni%04X"%cp; glyphs[nm]=glyph_from_em(contours); hmtx[nm]=(adv,lsb)
         cmap[cp]=nm; order.append(nm); simple.add(nm)
     def rect(x0,y0,x1,y1): return [('move',(x0,y0)),('line',(x1,y0)),('line',(x1,y1)),('line',(x0,y1))]
     add_simple(0x7C, shear([rect(0,-90,76,700)]), 76+2*SB)
     add_simple(0x5E, shear([[('move',(150,690)),('line',(280,470)),('line',(232,470)),
                        ('line',(150,610)),('line',(68,470)),('line',(20,470))]]), 300+2*SB)
+    def barred(src, cp, bars):
+        """currency synth: source letter + horizontal bar(s)"""
+        if cp in cmap or src not in glyphs: return
+        em,bw,_=em_contours_raw(src, baseline_for(src,"alpha"))
+        ys=[q[1] for c in em for p in c for q in ([p[1]] if p[0]!='curve' else list(p[1]))]
+        xs=[q[0] for c in em for p in c for q in ([p[1]] if p[0]!='curve' else list(p[1]))]
+        x0,x1=min(xs)-40,max(xs)+40
+        add_simple(cp, em+shear([rect(x0,y-27,x1,y+27) for y in bars]), int(round(bw*S+2*SB)))
     s_em,sbw,_=em_contours_raw("uni0053", baseline_for("uni0053","alpha"))   # already sheared
     xs=[q[0] for c in s_em for p in c for q in ([p[1]] if p[0]!='curve' else [p[1][2]])]
     scx=(min(xs)+max(xs))/2
     add_simple(0x24, s_em+shear([rect(scx-26,-70,scx+26,760)]), int(round(sbw*S+2*SB)))
+    barred("uni0057",0x20A9,[300])                 # ₩ = W + bar
+    barred("uni0043",0x20AC,[300,430])             # € = C + bars
+    barred("uni0059",0x00A5,[240,370])             # ¥ = Y + bars
     hy_em,_,_=em_contours_raw("uni002D", baseline_for("uni002D","symbol"))
     hys=[q[1] for c in hy_em for p in c for q in ([p[1]] if p[0]!='curve' else [p[1][2]])]
     hymid=(min(hys)+max(hys))/2; hyth=max(56,(max(hys)-min(hys)))
@@ -82,12 +94,13 @@ def build(family, out, include_korean):
     add_simple(0x2014, shear([rect(20,hymid-hyth/2,840,hymid+hyth/2)]), 880)
 
     def add_comp(cp, comps, adv):
+        if cp in cmap: return                    # drawn glyph wins
         nm="uni%04X"%cp; glyphs[nm]=make_comp(comps); hmtx[nm]=(adv,0)
         cmap[cp]=nm; order.append(nm)
     add_comp(0x2026,[("uni002E",1.0,0,0),("uni002E",1.0,300,0),("uni002E",1.0,600,0)],900+2*SB)  # …
     add_comp(0x00B7,[("uni002E",1.0,0,250)], hmtx["uni002E"][0])                                  # ·
     def alias(cp,src):
-        if src in glyphs: cmap[cp]=src
+        if src in glyphs and cp not in cmap: cmap[cp]=src
     alias(0x00A0,"space"); alias(0x0060,"uni0027")
     alias(0x2018,"uni0027"); alias(0x2019,"uni0027")
     alias(0x201C,"uni0022"); alias(0x201D,"uni0022")

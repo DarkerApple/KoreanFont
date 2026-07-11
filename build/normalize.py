@@ -5,8 +5,8 @@ import hangul
 from fontcommon import S, eff_f
 meta=json.load(open("meta.json"))
 OUT="glyphs_norm"; os.makedirs(OUT, exist_ok=True)
-T_EM=85.0        # target final rendered stroke width (em)
-MAX_DILATE=6.0
+T_EM=72.0        # target final rendered stroke width (em; v2 pen is finer)
+MAX_DILATE=9.0
 PAD=10
 SPAN=1.16        # a bucket may span at most ±8% in scale
 MAXK=6
