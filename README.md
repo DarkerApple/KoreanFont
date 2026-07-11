@@ -1,13 +1,13 @@
 # Lightheaded — 손글씨 폰트
 
-A light, even-weight **handwriting font built from hand-drawn templates** —
-Korean (한글), Latin, digits and symbols — generated automatically from photos
-of filled-in jamo/ASCII template sheets.
+A light, even-weight **handwriting font built from hand-drawn worksheets** —
+Korean (한글), Latin, digits and symbols — generated automatically from a
+tablet-drawn glyph worksheet (`build/raw/LightheadedRAW.pdf`).
 
 | Download | Coverage | Format |
 |---|---|---|
 | **[`Lightheaded-Regular.ttf`](Lightheaded-Regular.ttf)** | Korean + Latin + symbols | TrueType (recommended, ≈0.8 MB) |
-| **[`Lightheaded-Regular.otf`](Lightheaded-Regular.otf)** | Korean + Latin + symbols | OpenType/CFF (≈20 MB — CFF can't share composed syllables; prefer the TTF) |
+| **[`Lightheaded-Regular.otf`](Lightheaded-Regular.otf)** | Korean + Latin + symbols | OpenType/CFF (≈12 MB — CFF can't share composed syllables; prefer the TTF) |
 | **[`Lightheaded-Latin-Regular.ttf`](Lightheaded-Latin-Regular.ttf)** | Latin + symbols only | TrueType (≈0.04 MB) |
 | **[`Lightheaded-Latin-Regular.otf`](Lightheaded-Latin-Regular.otf)** | Latin + symbols only | OpenType/CFF |
 
@@ -28,16 +28,16 @@ Only **67 jamo + 88 ASCII glyphs were hand-drawn**; the 11,172 syllables are
 assembled from the jamo by an automatic composition engine (6 layout types,
 position-aware finals), so Korean is fully typeable.
 
-The **Latin version** has the same 99 outlines but no Hangul — use it when you
-only need English/symbols, or want a tiny file.
+The **Latin version** has the same 117 outlines but no Hangul — use it when
+you only need English/symbols, or want a tiny file.
 
 ## Consistency & weight
 
 The font is tuned for an even, *lightheaded* look:
 
-- **Stroke weight** matched at ~85 em across Korean and Latin. Each cho/jung
-  jamo carries two weight variants (large placements vs batchim placements) so
-  syllables with and without finals render at the same optical weight.
+- **Stroke weight** matched at ~72 em across Korean and Latin. Every jamo is
+  calibrated per placement-scale bucket (weight variants selected at compose
+  time) so all contexts render at the same optical weight.
 - **Letter sizes** pulled toward consistent cap-height / x-height per category
   (with descender bowls sized to x-height and over-wide letters width-capped).
 - **Consistent forward tilt** matching the natural lean of the handwriting.
@@ -48,8 +48,8 @@ The font is tuned for an even, *lightheaded* look:
 
 ## How it was made
 
-1. **Extract** the pen strokes from each template cell (drop printed reference,
-   grid lines, neighbour-cell bleed).
+1. **Extract** the ink from each worksheet cell, located via the PDF's own
+   U+XXXX captions (the gray reference letters and guides drop out).
 2. **Normalise** stroke weight & letter size.
 3. **Vectorise** with `potrace`.
 4. **Compose** all 11,172 syllables from the jamo as TrueType composites.
