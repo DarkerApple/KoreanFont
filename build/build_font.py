@@ -76,10 +76,10 @@ def build(family, out, include_korean):
 
     nsyl=0; ncompat=0
     if include_korean:
-        # base jamo (simple, cleaned); cho/jung carry L/S weight variants
-        basegids=[f"{r}{i:02d}{v}" for r,n in (("cho",19),("jung",21))
-                  for i in range(n) for v in ("_L","_S")]
-        basegids+=["jong%02d"%i for i in range(27)]
+        # base jamo (simple, cleaned); one weight variant per scale bucket
+        import json as _json
+        buckets=_json.load(open("buckets.json"))
+        basegids=[f"{g}_{k}" for g,c in sorted(buckets.items()) for k in range(len(c))]
         for gid in basegids:
             nm=hangul.base_name(gid)
             glyphs[nm]=glyph_from_em(hangul.base_contours(gid)); hmtx[nm]=(1000,0)

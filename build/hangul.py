@@ -1,5 +1,7 @@
 """Hangul syllable composition: place cho/jung/jong jamo into zones."""
+import json as _json, os as _os, re as _re
 from fontcommon import traces, meta
+_B=_json.load(open("buckets.json")) if _os.path.exists("buckets.json") else {}
 CHO =['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
 JUNG=['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ']
 JONG=['ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
@@ -20,17 +22,31 @@ def zones(jung, has_jong):
         if vt=='horz': return dict(cho=(.04,.02,.92,.52), jung=(.04,.55,.92,.43))
         return dict(cho=(.02,.02,.43,.45), jung=(.05,.03,.93,.95))   # mix
     else:
-        if vt=='vert': return dict(cho=(.02,.02,.50,.64), jung=(.53,.02,.45,.64), jong=(.12,.69,.76,.29))
-        if vt=='horz': return dict(cho=(.05,.02,.90,.34), jung=(.04,.37,.92,.30), jong=(.12,.69,.76,.29))
-        return dict(cho=(.02,.02,.40,.42), jung=(.27,.02,.71,.63), jong=(.12,.69,.76,.29))  # mix
+        if vt=='vert': return dict(cho=(.02,.02,.50,.61), jung=(.53,.02,.45,.61), jong=(.10,.645,.80,.345))
+        if vt=='horz': return dict(cho=(.05,.02,.90,.32), jung=(.04,.35,.92,.28), jong=(.10,.645,.80,.345))
+        return dict(cho=(.02,.02,.40,.40), jung=(.27,.02,.71,.61), jong=(.10,.645,.80,.345))  # mix
 
 # per-role fill factor and alignment (ax,ay in 0..1; .5=center)
-ROLE_FIT={'cho':0.95,'jung':0.95,'jong':0.95}
+ROLE_FIT={'cho':0.95,'jung':0.95,'jong':0.99}
 
 def T(gid):
-    """Trace lookup with fallback to the un-suffixed jamo (first pipeline pass)."""
+    """Trace lookup with fallbacks: variant -> plain -> raw."""
     if gid in traces: return traces[gid]
-    return traces[gid.replace('_L','').replace('_S','')]
+    base=_re.sub(r'_\d+$','',gid)
+    if base in traces: return traces[base]
+    return traces['raw_'+base]
+
+def select_variant(gid, zone, fill, align):
+    """Pick the weight variant whose calibration scale is nearest this placement
+    (selection geometry always from the raw trace for determinism)."""
+    B=_B.get(gid)
+    if not B: return gid
+    key='raw_'+gid if 'raw_'+gid in traces else gid
+    sc,x0,yT,W,H=placement_raw(key, zone, fill, align, opt_gid=gid)
+    s=H*sc/1000.0
+    k=min(range(len(B)), key=lambda i:abs(B[i]-s))
+    vg=f"{gid}_{k}"
+    return vg if vg in traces else gid
 
 def optical_fill(gid, fill):
     """Adapt each jamo's size to its complexity: simple consonants (ㄱㄴㅅ…)
@@ -38,6 +54,21 @@ def optical_fill(gid, fill):
     if gid.startswith('jung'): return fill
     n=len(T(gid)[2])               # traced contour count = stroke complexity
     return fill*(0.90 if n<=1 else 0.96 if n==2 else 1.0)
+
+def placement_raw(gid, zone, fill, align, opt_gid=None):
+    """placement() without variant selection (used for selection itself)."""
+    fill=optical_fill(opt_gid or gid, fill)
+    W,H,cs=T(gid)
+    zx,zy,zw,zh=zone
+    zL=SQ_L+zx*SQW; zR=SQ_L+(zx+zw)*SQW
+    zTop=SQ_T-zy*SQH; zBot=SQ_T-(zy+zh)*SQH
+    zwe, zhe = zR-zL, zTop-zBot
+    sc=min(fill*zwe/W, fill*zhe/H)
+    gw, gh = W*sc, H*sc
+    ax,ay=align
+    x0=zL+(zwe-gw)*ax
+    yTop=zTop-(zhe-gh)*ay
+    return sc, x0, yTop, W, H
 
 def placement(gid, zone, fill, align):
     """Return (sc, x0, yTop, W, H): scale (px->em) and top-left anchor in em."""
@@ -55,6 +86,7 @@ def placement(gid, zone, fill, align):
     return sc, x0, yTop, W, H
 
 def place(gid, zone, fill, align):
+    gid=select_variant(gid, zone, fill, align)
     sc,x0,yTop,W,H=placement(gid,zone,fill,align)
     _,_,cs=T(gid)
     def conv(px,py): return (x0+px*sc, yTop-py*sc)
@@ -86,6 +118,7 @@ def base_name(gid): return "jamo_"+gid     # e.g. jamo_cho00
 
 def component(gid, zone, fill, align):
     """Return (base_glyph_name, scale, dx, dy) referencing the normalised jamo."""
+    gid=select_variant(gid, zone, fill, align)
     sc,x0,yTop,W,H=placement(gid,zone,fill,align)
     scale=H*sc/1000.0
     return base_name(gid), scale, x0, yTop-H*sc
@@ -107,16 +140,15 @@ COMPOUND_JONG={2,4,5,8,9,10,11,12,13,14,17}
 def jong_zone(j0, base):
     """Wider/taller zone for compound finals so they don't get squished."""
     if j0 in COMPOUND_JONG:
-        return (.03, base[1]-.01, .94, base[3]+.02)
-    return (.15, base[1], .70, base[3])
+        return (.02, base[1]-.01, .96, base[3]+.02)
+    return (.13, base[1], .74, base[3])
 
 def compose(cho_i, jung_i, jong_full):
     has=jong_full>0
-    v="_S" if has else "_L"                 # weight variant per context
     z=zones(jung_i, has); vt=vtype(jung_i)
     cs=[]
-    cs+=place("cho%02d"%cho_i+v, z['cho'], ROLE_FIT['cho'], align_for('cho',vt))
-    cs+=place("jung%02d"%jung_i+v, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
+    cs+=place("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt))
+    cs+=place("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
     if has:
         jz=jong_zone(jong_full-1, z['jong'])
         cs+=place("jong%02d"%(jong_full-1), jz, ROLE_FIT['jong'], align_for('jong',vt))
@@ -124,10 +156,9 @@ def compose(cho_i, jung_i, jong_full):
 
 def compose_components(cho_i, jung_i, jong_full):
     has=jong_full>0
-    v="_S" if has else "_L"                 # weight variant per context
     z=zones(jung_i, has); vt=vtype(jung_i)
-    comps=[component("cho%02d"%cho_i+v, z['cho'], ROLE_FIT['cho'], align_for('cho',vt)),
-           component("jung%02d"%jung_i+v, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))]
+    comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt)),
+           component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))]
     if has:
         jz=jong_zone(jong_full-1, z['jong'])
         comps.append(component("jong%02d"%(jong_full-1), jz, ROLE_FIT['jong'], align_for('jong',vt)))
@@ -135,7 +166,6 @@ def compose_components(cho_i, jung_i, jong_full):
 
 # standalone jamo (for compatibility-jamo codepoints): centred in the square
 def standalone_component(gid):
-    if gid.startswith(('cho','jung')): gid=gid+"_L"
     return component(gid, (.12,.06,.76,.88), 0.90, (0.5,0.5))
 
 def syl_code(ci,ji,ki): return 0xAC00 + (ci*21+ji)*28 + ki

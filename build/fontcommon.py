@@ -10,7 +10,7 @@ B0    = 0.71        # global baseline in box coords (used for symbols)
 DESC_DEPTH = 0.10   # descender depth in box units
 DESCSET = set('gjpqy')
 CAP_H, X_H, ASC, DESC = 700, 500, 880, -290
-SLANT = 0.05        # consistent forward tilt (x += SLANT*y about baseline)
+SLANT = 0.028       # gentle forward tilt (~1.6deg) (x += SLANT*y about baseline)
 MAXW  = 0.82        # cap a glyph's ink width (em fraction) so wide letters (M) don't balloon
 
 traces = pickle.load(open("traces.pkl","rb"))
@@ -22,15 +22,15 @@ def category_for_cp(cp):
     if ('A'<=ch<='Z') or ('a'<=ch<='z') or ('0'<=ch<='9'): return 'alpha'
     return 'symbol'
 
-SIZE_BLEND = 0.78
+SIZE_BLEND = 0.92
 def _ref_target(gid):
     """(reference height in box units, target em, (f_min,f_max)) per category."""
     m=meta[gid]
     if m['role']!='uni': return None
     ch=chr(m['cp']); nx0,ny0,nx1,ny1=m['box_rel']; bh=ny1-ny0
-    if ('A'<=ch<='Z') or ('0'<=ch<='9'): return bh, CAP_H, (0.85,1.30)
-    if ch in 'acemnorsuvwxz':            return bh, X_H,   (0.85,1.30)
-    if ch in 'bdfhklt':                  return bh, 700,   (0.85,1.25)   # ascenders ≈ cap
+    if ('A'<=ch<='Z') or ('0'<=ch<='9'): return bh, CAP_H, (0.80,1.45)
+    if ch in 'acemnorsuvwxz':            return bh, X_H,   (0.80,1.45)
+    if ch in 'bdfhklt':                  return bh, 700,   (0.80,1.40)   # ascenders ≈ cap
     if ch in 'gpqy':  return (ny1-DESC_DEPTH)-ny0, X_H, (0.95,1.50)      # size bowl to x-height
     if ch=='j':       return (ny1-DESC_DEPTH)-ny0, X_H, (0.95,1.50)
     if ch=='i':       return bh, 680, (0.90,1.20)
