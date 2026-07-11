@@ -5,66 +5,111 @@ import hangul
 from fontcommon import S, eff_f
 meta=json.load(open("meta.json"))
 OUT="glyphs_norm"; os.makedirs(OUT, exist_ok=True)
-T_EM=72.0        # target final rendered stroke width (em; v2 pen is finer)
-GID_BOOST={'jung16':1.12,'jung19':1.08}   # ㅟ/ㅢ render thin at their wide scale
+T_EM=80.0        # target final rendered stroke width (em)
+GID_BOOST={}     # directional targeting handles ㅟ/ㅢ now
 MAX_DILATE=9.0
-PAD=10
-SPAN=1.16        # a bucket may span at most ±8% in scale
-MAXK=6
+PAD=12
+SPAN=1.16        # scale bucket max span
+RSPAN=1.10       # ratio bucket max span
+MAXK=14
 
-# ---- collect every placement scale per jamo across all 11,172 syllables ----
-scales={}
+# ---- collect every placement (scale, anisotropy) per jamo ----
+pl={}
 for ci in range(19):
   for ji in range(21):
     for ki in range(28):
       for name,bx,by,dx,dy in hangul.compose_components(ci,ji,ki):
         gid=re.sub(r'_\d+$','',name.replace('jamo_',''))
-        scales.setdefault(gid,[]).append((bx*by)**0.5)
+        pl.setdefault(gid,[]).append(((bx*by)**0.5, bx/by))
 
-# ---- cluster each jamo's scales: split widest bucket at its largest gap ----
-buckets={}
-for gid,v in scales.items():
-    clusters=[np.sort(np.array(v))]
-    while len(clusters)<MAXK:
-        spans=[(c.max()/c.min() if c.min()>0 else 1.0) for c in clusters]
+def split1d(vals, span, maxk):
+    cl=[np.sort(np.array(vals))]
+    while len(cl)<maxk:
+        spans=[(c.max()/c.min() if c.min()>0 else 1.0) for c in cl]
         j=int(np.argmax(spans))
-        if spans[j]<=SPAN: break
-        c=clusters[j]
-        gaps=c[1:]/c[:-1]
-        cut=int(np.argmax(gaps))+1
-        clusters[j:j+1]=[c[:cut], c[cut:]]
-    buckets[gid]=sorted(float(np.median(c)) for c in clusters)
+        if spans[j]<=span: break
+        c=cl[j]; cut=int(np.argmax(c[1:]/c[:-1]))+1
+        cl[j:j+1]=[c[:cut],c[cut:]]
+    return cl
+
+buckets={}
+for gid,v in pl.items():
+    geos=[g for g,r in v]
+    out=[]
+    for gc in split1d(geos, SPAN, 5):
+        glo,ghi=gc.min(),gc.max()
+        rs=[r for g,r in v if glo<=g<=ghi]
+        for rc in split1d(rs, RSPAN, 4):
+            out.append([float(np.median(gc)), float(np.median(rc))])
+    # dedupe near-identical
+    ded=[]
+    for g,r in out:
+        if not any(abs(np.log(g/g2))<.04 and abs(np.log(r/r2))<.06 for g2,r2 in ded):
+            ded.append([g,r])
+    buckets[gid]=ded
 json.dump(buckets, open("buckets.json","w"))
-print("buckets per jamo:", {k:len(v) for k,v in sorted(buckets.items())[:6]}, "...")
-print("total base variants:", sum(len(v) for v in buckets.values()))
+print("total variants:", sum(len(v) for v in buckets.values()))
 
-def half_px(fg):
-    if fg.sum()<8: return 0.0
-    dt=ndimage.distance_transform_edt(fg)
-    return 2*np.median(dt[fg])
+def runlen(fg, axis):
+    """Per-pixel run length along axis (vectorised)."""
+    f=fg.astype(np.int32)
+    if axis==1: f=f.T
+    H,W=f.shape
+    idx=np.arange(H)[:,None]*np.ones((1,W),np.int32)
+    # distance since last zero (top->down)
+    last=np.where(f==0, idx, -1)
+    last=np.maximum.accumulate(last,axis=0)
+    down=idx-last
+    lastr=np.where(f[::-1]==0, idx, -1)
+    lastr=np.maximum.accumulate(lastr,axis=0)
+    up=(idx-lastr)[::-1]
+    rl=down+up-1
+    rl[f==0]=0
+    return rl if axis==0 else rl.T
 
-def adjust_iter(fg0, th):
-    """Iteratively erode/dilate (from the original ink) until half-width hits th."""
-    fg0=np.pad(fg0, PAD)
-    dt_in =ndimage.distance_transform_edt(fg0)
-    dt_out=ndimage.distance_transform_edt(~fg0)
-    c=0.0; cur=fg0
+def dir_widths(fg):
+    """(vertical-stroke width, horizontal-stroke width) in px."""
+    if fg.sum()<8: return 0.0,0.0
+    h=runlen(fg,1)      # horizontal run length (width of vertical strokes)
+    v=runlen(fg,0)
+    vm=fg&(h<v); hm=fg&(v<=h)
+    wv=float(np.median(h[vm])) if vm.sum()>20 else 0.0
+    wh=float(np.median(v[hm])) if hm.sum()>20 else 0.0
+    if not wv: wv=wh
+    if not wh: wh=wv
+    return wv,wh
+
+def morph(fg, ex, ey, dilate=False):
+    """Elliptical erode/dilate by (ex,ey) px (either may be 0)."""
+    ex=max(ex,1e-6); ey=max(ey,1e-6)
+    if dilate:
+        dt=ndimage.distance_transform_edt(~fg, sampling=(1.0/ey,1.0/ex))
+        return dt<=1.0
+    dt=ndimage.distance_transform_edt(fg, sampling=(1.0/ey,1.0/ex))
+    return dt>1.0
+
+def adjust_dir(fg0, thx, thy):
+    """Iteratively hit half-widths thx (vertical strokes) / thy (horizontal)."""
+    fg0=np.pad(fg0,PAD)
+    cx=cy=0.0; cur=fg0
     for _ in range(5):
-        h=half_px(cur)
-        e=h-th
-        if abs(e)<=0.25: break
-        c+=e
-        if c>=0:
-            nxt=dt_in>c
-            if nxt.sum() < 0.22*fg0.sum():
-                c-=e; break
-            cur=nxt
-        else:
-            cur=dt_out<=min(-c, MAX_DILATE)
+        wv,wh=dir_widths(cur)
+        ex=wv/2-thx; ey=wh/2-thy
+        if abs(ex)<=0.3 and abs(ey)<=0.3: break
+        cx+=ex; cy+=ey
+        cx=max(min(cx, 60), -MAX_DILATE); cy=max(min(cy, 60), -MAX_DILATE)
+        cur=fg0
+        if cx>0.2 or cy>0.2:
+            cur=morph(cur, max(cx,0.01), max(cy,0.01))
+            if cur.sum()<0.18*fg0.sum():          # don't dissolve
+                cx*=0.5; cy*=0.5
+                cur=morph(fg0, max(cx,0.01), max(cy,0.01))
+        if cx<-0.2 or cy<-0.2:
+            cur=morph(cur, max(-cx,0.01), max(-cy,0.01), dilate=True) | cur
     return cur
 
-def emit(gid, out_name, th, fg):
-    out=adjust_iter(fg, th)
+def emit(out_name, fg, thx, thy):
+    out=adjust_dir(fg, thx, thy)
     ys,xs=np.where(out)
     out=out[ys.min():ys.max()+1, xs.min():xs.max()+1]
     Image.fromarray(np.where(out,0,255).astype(np.uint8)).save(f"{OUT}/{out_name}.png")
@@ -75,8 +120,12 @@ for gid,m in meta.items():
     H=fg.shape[0]
     if m['role']=='uni':
         nx0,ny0,nx1,ny1=m['box_rel']; boxperpx=(ny1-ny0)/H
-        emit(gid, gid, (T_EM/(boxperpx*S*eff_f(gid)))/2.0, fg); n+=1
+        th=(T_EM/(boxperpx*S*eff_f(gid)))/2.0
+        emit(gid, fg, th, th); n+=1
     else:
-        for k,s in enumerate(buckets[gid]):
-            emit(gid, f"{gid}_{k}", ((T_EM*GID_BOOST.get(gid,1.0)/s)*H/1000.0)/2.0, fg); n+=1
-print(f"normalized -> {n} bitmaps (scale-bucketed variants)")
+        B=T_EM*GID_BOOST.get(gid,1.0)
+        for k,(g,r) in enumerate(buckets[gid]):
+            bx=g*(r**0.5); by=g/(r**0.5)
+            sx=bx*1000.0/H; sy=by*1000.0/H      # em per px in each direction
+            emit(f"{gid}_{k}", fg, (B/sx)/2.0, (B/sy)/2.0); n+=1
+print(f"normalized -> {n} bitmaps (2D scale+ratio buckets, directional weight)")

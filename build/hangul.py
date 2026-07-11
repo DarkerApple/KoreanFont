@@ -21,12 +21,12 @@ def zones(jung, has_jong):
     if not has_jong:
         if vt=='vert': return dict(cho=(.02,.12,.52,.76), jung=(.53,.02,.45,.96))
         if vt=='horz': return dict(cho=(.04,.02,.92,.54), jung=(.04,.56,.92,.42))
-        return dict(cho=(.02,.02,.43,.46), jung=(.05,.03,.89,.95))   # mix
+        return dict(cho=(.02,.02,.47,.52), jung=(.05,.03,.89,.95))   # mix
     else:
         # batchim band sits close under the body
         if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.54), jong=(.06,.56,.88,.385))
         if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.40,.92,.20), jong=(.06,.605,.88,.35))
-        return dict(cho=(.02,.02,.42,.38), jung=(.27,.02,.68,.57), jong=(.06,.585,.88,.375))  # mix
+        return dict(cho=(.02,.02,.45,.42), jung=(.27,.02,.68,.57), jong=(.06,.585,.88,.375))  # mix
 
 # per-role fill factor and alignment (ax,ay in 0..1; .5=center)
 ROLE_FIT={'cho':0.96,'jung':0.96,'jong':1.0}
@@ -39,14 +39,17 @@ def T(gid):
     return traces['raw_'+base]
 
 def select_variant(gid, zone, fill, align):
-    """Pick the weight variant whose calibration scale is nearest this placement
-    (selection geometry always from the raw trace for determinism)."""
+    """Pick the weight variant nearest this placement in (scale, anisotropy)."""
     B=_B.get(gid)
     if not B: return gid
     key='raw_'+gid if 'raw_'+gid in traces else gid
     (sx,sy),x0,yT,W,H=placement_raw(key, zone, fill, align, opt_gid=gid)
-    s=H*((sx*sy)**0.5)/1000.0        # stroke responds to the mean scale
-    k=min(range(len(B)), key=lambda i:abs(B[i]-s))
+    import math
+    g=H*((sx*sy)**0.5)/1000.0; r=sx/sy
+    def dist(b):
+        gb,rb=(b if isinstance(b,(list,tuple)) else (b,1.0))
+        return abs(math.log(g/gb))+0.7*abs(math.log(r/rb))
+    k=min(range(len(B)), key=lambda i:dist(B[i]))
     vg=f"{gid}_{k}"
     return vg if vg in traces else gid
 
@@ -65,8 +68,8 @@ POLICY={'cho':((0.78,0.97),1.80,1.15), 'jong':((0.80,0.99),1.30,1.05)}
 
 RING_A=1.35           # ㅇ stretches toward its zone's aspect (per vowel direction)
 
-def _scales_for(gid, zone, fill):
-    W,H,cs=T(gid)
+def _scales_for(gid, zone, fill, trace_key=None):
+    W,H,cs=T(trace_key or gid)
     zx,zy,zw,zh=zone
     zwe=zw*SQW; zhe=zh*SQH
     if gid.startswith('cho11'): fill*=0.92        # ring slightly smaller overall
@@ -92,13 +95,14 @@ def _scales_for(gid, zone, fill):
 
 def placement_raw(gid, zone, fill, align, opt_gid=None):
     """placement() without variant selection (used for selection itself)."""
-    fill=optical_fill(opt_gid or gid, fill)
+    logical=opt_gid or _re.sub(r'^raw_','',gid)
+    fill=optical_fill(logical, fill)
     W,H,cs=T(gid)
     zx,zy,zw,zh=zone
     zL=SQ_L+zx*SQW; zR=SQ_L+(zx+zw)*SQW
     zTop=SQ_T-zy*SQH; zBot=SQ_T-(zy+zh)*SQH
     zwe, zhe = zR-zL, zTop-zBot
-    sx,sy=_scales_for(gid, zone, fill)
+    sx,sy=_scales_for(logical, zone, fill, trace_key=gid)
     gw, gh = W*sx, H*sy
     ax,ay=align
     x0=zL+(zwe-gw)*ax
