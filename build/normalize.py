@@ -16,9 +16,9 @@ scales={}
 for ci in range(19):
   for ji in range(21):
     for ki in range(28):
-      for name,scale,dx,dy in hangul.compose_components(ci,ji,ki):
+      for name,bx,by,dx,dy in hangul.compose_components(ci,ji,ki):
         gid=re.sub(r'_\d+$','',name.replace('jamo_',''))
-        scales.setdefault(gid,[]).append(scale)
+        scales.setdefault(gid,[]).append((bx*by)**0.5)
 
 # ---- cluster each jamo's scales: split widest bucket at its largest gap ----
 buckets={}

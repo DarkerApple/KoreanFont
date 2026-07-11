@@ -8,13 +8,16 @@ import hangul
 VERSION="1.000"
 
 def make_comp(components):
-    """Composite glyph; bakes the global SLANT in (shear about baseline y=0)."""
+    """Composite glyph; bakes the global SLANT in (shear about baseline y=0).
+    Accepts (name,bx,by,dx,dy) anisotropic or legacy (name,scale,dx,dy)."""
     g=Glyph(); g.numberOfContours=-1; g.components=[]
-    for name,scale,dx,dy in components:
+    for comp in components:
+        if len(comp)==5: name,bx,by,dx,dy=comp
+        else: name,bx,dx,dy=comp; by=bx
         c=GlyphComponent(); c.glyphName=name
         c.x=int(round(dx+SLANT*dy)); c.y=int(round(dy))
         c.flags=0x0002                       # ARGS_ARE_XY_VALUES
-        c.transform=[[float(scale),float(SLANT*scale)],[0.0,float(scale)]]
+        c.transform=[[float(bx),float(SLANT*by)],[0.0,float(by)]]
         g.components.append(c)
     return g
 
@@ -43,6 +46,22 @@ def build(family, out, include_korean):
         hmtx[name]=(int(round(bw*S+2*SB)), SB); cmap[cp]=name
         order.append(name); simple.add(name)
     if 0x5C in cmap: cmap[0x20A9]=cmap[0x5C]     # ₩ won == drawn backslash glyph
+
+    # ---- tabular digits: uniform advance, each digit centred ----
+    dws={}
+    for cp in range(0x30,0x3A):
+        gid="uni%04X"%cp
+        if gid in glyphs:
+            _,bw,_=em_contours_raw(gid, baseline_for(gid,'alpha'))
+            dws[cp]=bw*S
+    if dws:
+        advd=int(round(max(dws.values())+2*SB))
+        for cp,w in dws.items():
+            gid="uni%04X"%cp
+            pad=SB+(advd-2*SB-w)/2.0
+            em,_,_=em_contours_raw(gid, baseline_for(gid,'alpha'), sb=pad)
+            glyphs[gid]=glyph_from_em(em)
+            hmtx[gid]=(advd, int(round(pad)))
 
     # ---- synthesize $ ^ | and en/em dashes ----
     def add_simple(cp, contours, adv, lsb=SB):

@@ -19,7 +19,7 @@ def vtype(j): return 'vert' if j in VERT else ('horz' if j in HORZ else 'mix')
 def zones(jung, has_jong):
     vt=vtype(jung)
     if not has_jong:
-        if vt=='vert': return dict(cho=(.02,.02,.50,.96), jung=(.53,.02,.45,.96))
+        if vt=='vert': return dict(cho=(.02,.05,.50,.68), jung=(.53,.02,.45,.96))
         if vt=='horz': return dict(cho=(.04,.02,.92,.54), jung=(.04,.56,.92,.42))
         return dict(cho=(.02,.02,.43,.46), jung=(.05,.03,.93,.95))   # mix
     else:
@@ -44,8 +44,8 @@ def select_variant(gid, zone, fill, align):
     B=_B.get(gid)
     if not B: return gid
     key='raw_'+gid if 'raw_'+gid in traces else gid
-    sc,x0,yT,W,H=placement_raw(key, zone, fill, align, opt_gid=gid)
-    s=H*sc/1000.0
+    (sx,sy),x0,yT,W,H=placement_raw(key, zone, fill, align, opt_gid=gid)
+    s=H*((sx*sy)**0.5)/1000.0        # stroke responds to the mean scale
     k=min(range(len(B)), key=lambda i:abs(B[i]-s))
     vg=f"{gid}_{k}"
     return vg if vg in traces else gid
@@ -59,6 +59,27 @@ def optical_fill(gid, fill):
         return fill*(0.97 if n<=1 else 1.0)
     return fill*(0.90 if n<=1 else 0.96 if n==2 else 1.0)
 
+# per-role stretch policy: (h_min,h_max) as zone fraction, max vertical
+# anisotropy A, max width overstretch WCAP (x uniform fit)
+POLICY={'cho':((0.78,0.97),1.80,1.15), 'jong':((0.80,0.99),1.30,1.05)}
+
+def _scales_for(gid, zone, fill):
+    W,H,cs=T(gid)
+    zx,zy,zw,zh=zone
+    zwe=zw*SQW; zhe=zh*SQH
+    sx0=fill*zwe/W; sy0=fill*zhe/H
+    sc=min(sx0,sy0)
+    role='cho' if gid.startswith('cho') else 'jong' if gid.startswith('jong') else 'jung'
+    if role=='jung': return sc,sc
+    (fmin,fmax),A,WCAP=POLICY[role]
+    tmin,tmax=fmin*zhe,fmax*zhe
+    sy=sc
+    if H*sy<tmin: sy=min(tmin/H, sc*A, sy0)      # stretch short/wide consonants taller
+    if H*sy>tmax: sy=tmax/H                       # cap tall ones (e.g. the ㅇ ring)
+    sx=min(sx0, sc*WCAP, sy*A)                    # width near its drawn proportion
+    sx=max(sx, min(sy/A, sx0))
+    return sx,sy
+
 def placement_raw(gid, zone, fill, align, opt_gid=None):
     """placement() without variant selection (used for selection itself)."""
     fill=optical_fill(opt_gid or gid, fill)
@@ -67,33 +88,21 @@ def placement_raw(gid, zone, fill, align, opt_gid=None):
     zL=SQ_L+zx*SQW; zR=SQ_L+(zx+zw)*SQW
     zTop=SQ_T-zy*SQH; zBot=SQ_T-(zy+zh)*SQH
     zwe, zhe = zR-zL, zTop-zBot
-    sc=min(fill*zwe/W, fill*zhe/H)
-    gw, gh = W*sc, H*sc
+    sx,sy=_scales_for(gid, zone, fill)
+    gw, gh = W*sx, H*sy
     ax,ay=align
     x0=zL+(zwe-gw)*ax
     yTop=zTop-(zhe-gh)*ay
-    return sc, x0, yTop, W, H
+    return (sx,sy), x0, yTop, W, H
 
 def placement(gid, zone, fill, align):
-    """Return (sc, x0, yTop, W, H): scale (px->em) and top-left anchor in em."""
-    fill=optical_fill(gid, fill)
-    W,H,cs=T(gid)
-    zx,zy,zw,zh=zone
-    zL=SQ_L+zx*SQW; zR=SQ_L+(zx+zw)*SQW
-    zTop=SQ_T-zy*SQH; zBot=SQ_T-(zy+zh)*SQH
-    zwe, zhe = zR-zL, zTop-zBot
-    sc=min(fill*zwe/W, fill*zhe/H)
-    gw, gh = W*sc, H*sc
-    ax,ay=align
-    x0=zL+(zwe-gw)*ax
-    yTop=zTop-(zhe-gh)*ay
-    return sc, x0, yTop, W, H
+    return placement_raw(gid, zone, fill, align)
 
 def place(gid, zone, fill, align):
     gid=select_variant(gid, zone, fill, align)
-    sc,x0,yTop,W,H=placement(gid,zone,fill,align)
+    (sx,sy),x0,yTop,W,H=placement(gid,zone,fill,align)
     _,_,cs=T(gid)
-    def conv(px,py): return (x0+px*sc, yTop-py*sc)
+    def conv(px,py): return (x0+px*sx, yTop-py*sy)
     out=[]
     for c in cs:
         seg2=[('move',conv(*c[0][1]))]
@@ -121,11 +130,11 @@ def base_contours(gid):
 def base_name(gid): return "jamo_"+gid     # e.g. jamo_cho00
 
 def component(gid, zone, fill, align):
-    """Return (base_glyph_name, scale, dx, dy) referencing the normalised jamo."""
+    """Return (base_name, bx, by, dx, dy): anisotropic scales relative to the
+    height-1000 base glyph, plus offset."""
     gid=select_variant(gid, zone, fill, align)
-    sc,x0,yTop,W,H=placement(gid,zone,fill,align)
-    scale=H*sc/1000.0
-    return base_name(gid), scale, x0, yTop-H*sc
+    (sx,sy),x0,yTop,W,H=placement(gid,zone,fill,align)
+    return base_name(gid), H*sx/1000.0, H*sy/1000.0, x0, yTop-H*sy
 
 # alignment per role/type: pull jamo toward where they belong
 def align_for(role, vt):
@@ -148,24 +157,50 @@ def jong_zone(j0, base):
     return (.11, base[1], .78, base[3])
 
 def compose(cho_i, jung_i, jong_full):
-    has=jong_full>0
-    z=zones(jung_i, has); vt=vtype(jung_i)
     cs=[]
-    cs+=place("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt))
-    cs+=place("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
-    if has:
-        jz=jong_zone(jong_full-1, z['jong'])
-        cs+=place("jong%02d"%(jong_full-1), jz, ROLE_FIT['jong'], align_for('jong',vt))
+    for name,bx,by,dx,dy in compose_components(cho_i,jung_i,jong_full):
+        gid=name.replace('jamo_','')
+        for c in base_contours(gid):
+            seg2=[]
+            for seg in c:
+                if seg[0]=='curve':
+                    seg2.append(('curve',tuple((dx+p[0]*bx, dy+p[1]*by) for p in seg[1])))
+                else:
+                    seg2.append((seg[0],(dx+seg[1][0]*bx, dy+seg[1][1]*by)))
+            cs.append(seg2)
     return cs
+
+COUPLE=125            # gap between cho ink and a vertical vowel bar (em)
+
+def _ink_span(comps):
+    xs=[]
+    for name,bx,by,dx,dy in comps:
+        gid=name.replace('jamo_','')
+        W,H,_=T(gid)
+        xs.append(dx); xs.append(dx + W*(1000.0/H)*bx)
+    return min(xs), max(xs)
 
 def compose_components(cho_i, jung_i, jong_full):
     has=jong_full>0
     z=zones(jung_i, has); vt=vtype(jung_i)
-    comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt)),
-           component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))]
+    comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt))]
+    jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
+    if vt=='vert':
+        # couple the vowel bar to the initial's right edge (commercial narrow syllables)
+        _,cmaxx=_ink_span(comps)
+        name,bx,by,dx,dy=jc
+        gid=name.replace('jamo_',''); W,H,_=T(gid)
+        jw=W*(1000.0/H)*bx
+        nx=min(cmaxx+COUPLE, SQ_R-jw)
+        jc=(name,bx,by,nx,dy)
+    comps.append(jc)
     if has:
         jz=jong_zone(jong_full-1, z['jong'])
         comps.append(component("jong%02d"%(jong_full-1), jz, ROLE_FIT['jong'], align_for('jong',vt)))
+    # optical centring of the whole syllable in its fixed advance
+    mn,mx=_ink_span(comps)
+    shift=(ADV-(mx-mn))/2.0 - mn
+    comps=[(n,bx,by,dx+shift,dy) for (n,bx,by,dx,dy) in comps]
     return comps
 
 # standalone jamo (for compatibility-jamo codepoints): centred in the square
