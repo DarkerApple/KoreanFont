@@ -21,12 +21,12 @@ def zones(jung, has_jong):
     if not has_jong:
         if vt=='vert': return dict(cho=(.02,.12,.52,.76), jung=(.53,.02,.45,.96))
         if vt=='horz': return dict(cho=(.04,.02,.92,.54), jung=(.04,.56,.92,.42))
-        return dict(cho=(.01,.02,.52,.57), jung=(.05,.03,.89,.95))   # mix
+        return dict(cho=(.01,.01,.56,.61), jung=(.05,.03,.89,.95))   # mix
     else:
         # batchim band sits close under the body
         if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.54), jong=(.06,.56,.88,.385))
         if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.40,.92,.20), jong=(.06,.605,.88,.35))
-        return dict(cho=(.01,.02,.49,.46), jung=(.27,.02,.68,.57), jong=(.06,.585,.88,.375))  # mix
+        return dict(cho=(.01,.01,.53,.49), jung=(.27,.02,.68,.57), jong=(.06,.585,.88,.375))  # mix
 
 # per-role fill factor and alignment (ax,ay in 0..1; .5=center)
 ROLE_FIT={'cho':0.96,'jung':0.96,'jong':1.0}
@@ -38,12 +38,12 @@ def T(gid):
     if base in traces: return traces[base]
     return traces['raw_'+base]
 
-def select_variant(gid, zone, fill, align):
+def select_variant(gid, zone, fill, align, free=False):
     """Pick the weight variant nearest this placement in (scale, anisotropy)."""
     B=_B.get(gid)
     if not B: return gid
     key='raw_'+gid if 'raw_'+gid in traces else gid
-    (sx,sy),x0,yT,W,H=placement_raw(key, zone, fill, align, opt_gid=gid)
+    (sx,sy),x0,yT,W,H=placement_raw(key, zone, fill, align, opt_gid=gid, free=free)
     import math
     g=H*((sx*sy)**0.5)/1000.0; r=sx/sy
     def dist(b):
@@ -68,13 +68,17 @@ POLICY={'cho':((0.78,0.97),1.80,1.15), 'jong':((0.80,0.99),1.30,1.05)}
 
 RING_A=1.35           # ㅇ stretches toward its zone's aspect (per vowel direction)
 
-def _scales_for(gid, zone, fill, trace_key=None):
+AFREE=2.6            # loose anisotropy cap in free-fit mode
+
+def _scales_for(gid, zone, fill, trace_key=None, free=False):
     W,H,cs=T(trace_key or gid)
     zx,zy,zw,zh=zone
     zwe=zw*SQW; zhe=zh*SQH
-    if gid.startswith('cho11'): fill*=0.92        # ring slightly smaller overall
+    if gid.startswith('cho11') and not free: fill*=0.92   # ring slightly smaller
     sx0=fill*zwe/W; sy0=fill*zhe/H
     sc=min(sx0,sy0)
+    if free:                                   # ratio unlocked: fill the zone
+        return min(sx0, sy0*AFREE), min(sy0, sx0*AFREE)
     role='cho' if gid.startswith('cho') else 'jong' if gid.startswith('jong') else 'jung'
     if gid.startswith('cho11'):                   # ㅇ: ellipse follows zone shape
         return min(sx0, sc*RING_A), min(sy0, sc*RING_A)
@@ -93,24 +97,24 @@ def _scales_for(gid, zone, fill, trace_key=None):
     sx=max(sx, min(sy/A, sx0))
     return sx,sy
 
-def placement_raw(gid, zone, fill, align, opt_gid=None):
+def placement_raw(gid, zone, fill, align, opt_gid=None, free=False):
     """placement() without variant selection (used for selection itself)."""
     logical=opt_gid or _re.sub(r'^raw_','',gid)
-    fill=optical_fill(logical, fill)
+    if not free: fill=optical_fill(logical, fill)
     W,H,cs=T(gid)
     zx,zy,zw,zh=zone
     zL=SQ_L+zx*SQW; zR=SQ_L+(zx+zw)*SQW
     zTop=SQ_T-zy*SQH; zBot=SQ_T-(zy+zh)*SQH
     zwe, zhe = zR-zL, zTop-zBot
-    sx,sy=_scales_for(logical, zone, fill, trace_key=gid)
+    sx,sy=_scales_for(logical, zone, fill, trace_key=gid, free=free)
     gw, gh = W*sx, H*sy
     ax,ay=align
     x0=zL+(zwe-gw)*ax
     yTop=zTop-(zhe-gh)*ay
     return (sx,sy), x0, yTop, W, H
 
-def placement(gid, zone, fill, align):
-    return placement_raw(gid, zone, fill, align)
+def placement(gid, zone, fill, align, free=False):
+    return placement_raw(gid, zone, fill, align, free=free)
 
 def place(gid, zone, fill, align):
     gid=select_variant(gid, zone, fill, align)
@@ -143,11 +147,11 @@ def base_contours(gid):
 
 def base_name(gid): return "jamo_"+gid     # e.g. jamo_cho00
 
-def component(gid, zone, fill, align):
+def component(gid, zone, fill, align, free=False):
     """Return (base_name, bx, by, dx, dy): anisotropic scales relative to the
     height-1000 base glyph, plus offset."""
-    gid=select_variant(gid, zone, fill, align)
-    (sx,sy),x0,yTop,W,H=placement(gid,zone,fill,align)
+    gid=select_variant(gid, zone, fill, align, free=free)
+    (sx,sy),x0,yTop,W,H=placement(gid,zone,fill,align,free=free)
     return base_name(gid), H*sx/1000.0, H*sy/1000.0, x0, yTop-H*sy
 
 # alignment per role/type: pull jamo toward where they belong
@@ -197,7 +201,8 @@ def _ink_span(comps):
 def compose_components(cho_i, jung_i, jong_full):
     has=jong_full>0
     z=zones(jung_i, has); vt=vtype(jung_i)
-    comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt))]
+    comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt),
+                     free=(vt=='mix'))]
     jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
     if vt=='vert':
         # couple the vowel bar to the initial, with a floor so narrow bodies
