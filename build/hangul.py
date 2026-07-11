@@ -19,7 +19,7 @@ def vtype(j): return 'vert' if j in VERT else ('horz' if j in HORZ else 'mix')
 def zones(jung, has_jong):
     vt=vtype(jung)
     if not has_jong:
-        if vt=='vert': return dict(cho=(.02,.04,.52,.71), jung=(.53,.02,.45,.96))
+        if vt=='vert': return dict(cho=(.02,.12,.52,.76), jung=(.53,.02,.45,.96))
         if vt=='horz': return dict(cho=(.04,.02,.92,.54), jung=(.04,.56,.92,.42))
         return dict(cho=(.02,.02,.43,.46), jung=(.05,.03,.89,.95))   # mix
     else:
@@ -149,9 +149,9 @@ def component(gid, zone, fill, align):
 # alignment per role/type: pull jamo toward where they belong
 def align_for(role, vt):
     if role=='cho':
-        if vt=='vert': return (0.42,0.45)   # centered in left half
-        if vt=='horz': return (0.5,0.35)     # center, upper
-        return (0.35,0.30)
+        if vt=='vert': return (0.42,0.50)   # centred on the vowel bar
+        if vt=='horz': return (0.5,0.80)     # sink toward the vowel below
+        return (0.35,0.55)
     if role=='jung':
         if vt=='vert': return (0.85,0.5)     # bar toward the right edge (commercial)
         if vt=='horz': return (0.5,0.6)
@@ -205,10 +205,26 @@ def compose_components(cho_i, jung_i, jong_full):
         BAR_MIN=SQ_L+0.72*SQW
         nx=min(max(cmaxx+COUPLE, BAR_MIN), SQ_R-jw)
         jc=(name,bx,by,nx,dy)
+    if vt=='horz':
+        # chain the stack vertically: vowel top tucks to the cho bottom
+        VG1=-15                                  # slight overlap, like commercial
+        name,bx,by,dx,dy=jc
+        cho_bottom=comps[0][4]
+        jc=(name,bx,by,dx, cho_bottom+VG1-1000*by)
     comps.append(jc)
     if has:
         jz=jong_zone(jong_full-1, z['jong'])
-        comps.append(component("jong%02d"%(jong_full-1), jz, ROLE_FIT['jong'], align_for('jong',vt)))
+        jg=component("jong%02d"%(jong_full-1), jz, ROLE_FIT['jong'], align_for('jong',vt))
+        if vt=='horz':
+            VG2=30
+            n2,bx2,by2,dx2,dy2=jg
+            anchor_bottom=dy2                    # keep the block's bottom fixed
+            jung_bottom=jc[4]
+            jg=(n2,bx2,by2,dx2, jung_bottom-VG2-1000*by2)
+            lift=anchor_bottom-jg[4]             # shift the whole stack down to the anchor
+            comps=[(n,bx,by,dx,dy+lift) for (n,bx,by,dx,dy) in comps]
+            jg=(n2,bx2,by2,dx2,anchor_bottom)
+        comps.append(jg)
     # optical centring of the whole syllable in its fixed advance
     mn,mx=_ink_span(comps)
     shift=(ADV-(mx-mn))/2.0 - mn

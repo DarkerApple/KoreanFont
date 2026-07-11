@@ -6,6 +6,7 @@ from fontcommon import S, eff_f
 meta=json.load(open("meta.json"))
 OUT="glyphs_norm"; os.makedirs(OUT, exist_ok=True)
 T_EM=72.0        # target final rendered stroke width (em; v2 pen is finer)
+GID_BOOST={'jung16':1.12,'jung19':1.08}   # ㅟ/ㅢ render thin at their wide scale
 MAX_DILATE=9.0
 PAD=10
 SPAN=1.16        # a bucket may span at most ±8% in scale
@@ -77,5 +78,5 @@ for gid,m in meta.items():
         emit(gid, gid, (T_EM/(boxperpx*S*eff_f(gid)))/2.0, fg); n+=1
     else:
         for k,s in enumerate(buckets[gid]):
-            emit(gid, f"{gid}_{k}", ((T_EM/s)*H/1000.0)/2.0, fg); n+=1
+            emit(gid, f"{gid}_{k}", ((T_EM*GID_BOOST.get(gid,1.0)/s)*H/1000.0)/2.0, fg); n+=1
 print(f"normalized -> {n} bitmaps (scale-bucketed variants)")
