@@ -19,14 +19,14 @@ def vtype(j): return 'vert' if j in VERT else ('horz' if j in HORZ else 'mix')
 def zones(jung, has_jong):
     vt=vtype(jung)
     if not has_jong:
-        if vt=='vert': return dict(cho=(.02,.05,.50,.68), jung=(.53,.02,.45,.96))
+        if vt=='vert': return dict(cho=(.02,.04,.52,.71), jung=(.53,.02,.45,.96))
         if vt=='horz': return dict(cho=(.04,.02,.92,.54), jung=(.04,.56,.92,.42))
-        return dict(cho=(.02,.02,.43,.46), jung=(.05,.03,.93,.95))   # mix
+        return dict(cho=(.02,.02,.43,.46), jung=(.05,.03,.89,.95))   # mix
     else:
         # batchim band sits close under the body
         if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.54), jong=(.06,.56,.88,.385))
         if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.40,.92,.20), jong=(.06,.605,.88,.35))
-        return dict(cho=(.02,.02,.42,.38), jung=(.27,.02,.71,.57), jong=(.06,.585,.88,.375))  # mix
+        return dict(cho=(.02,.02,.42,.38), jung=(.27,.02,.68,.57), jong=(.06,.585,.88,.375))  # mix
 
 # per-role fill factor and alignment (ax,ay in 0..1; .5=center)
 ROLE_FIT={'cho':0.96,'jung':0.96,'jong':1.0}
@@ -77,7 +77,7 @@ def _scales_for(gid, zone, fill):
         return min(sx0, sc*RING_A), min(sy0, sc*RING_A)
     if role=='jung':
         if zwe>1.8*zhe:                           # flat vowels (ㅗㅜㅡ…) span the width
-            return min(sx0, sc*1.6), sc
+            return min(sx0, sc*2.1), sc
         return sc,sc
     (fmin,fmax),A,WCAP=POLICY[role]
     tmin,tmax=fmin*zhe,fmax*zhe
@@ -196,12 +196,14 @@ def compose_components(cho_i, jung_i, jong_full):
     comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt))]
     jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
     if vt=='vert':
-        # couple the vowel bar to the initial's right edge (commercial narrow syllables)
+        # couple the vowel bar to the initial, with a floor so narrow bodies
+        # (이/비) keep a commercial-consistent syllable width
         _,cmaxx=_ink_span(comps)
         name,bx,by,dx,dy=jc
         gid=name.replace('jamo_',''); W,H,_=T(gid)
         jw=W*(1000.0/H)*bx
-        nx=min(cmaxx+COUPLE, SQ_R-jw)
+        BAR_MIN=SQ_L+0.72*SQW
+        nx=min(max(cmaxx+COUPLE, BAR_MIN), SQ_R-jw)
         jc=(name,bx,by,nx,dy)
     comps.append(jc)
     if has:
