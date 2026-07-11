@@ -2,16 +2,18 @@ import json, re, numpy as np, os
 from PIL import Image
 from scipy import ndimage
 import hangul
+hangul._B={}          # collect placements from raw geometry only (deterministic buckets)
 from fontcommon import S, eff_f
 meta=json.load(open("meta.json"))
 OUT="glyphs_norm"; os.makedirs(OUT, exist_ok=True)
+for _f in os.listdir(OUT): os.remove(os.path.join(OUT,_f))   # no stale variants
 T_EM=80.0        # target final rendered stroke width (em)
 GID_BOOST={}     # directional targeting handles ㅟ/ㅢ now
 MAX_DILATE=9.0
 PAD=12
 SPAN=1.16        # scale bucket max span
 RSPAN=1.10       # ratio bucket max span
-MAXK=14
+MAXK=30
 
 # ---- collect every placement (scale, anisotropy) per jamo ----
 pl={}
@@ -36,10 +38,10 @@ buckets={}
 for gid,v in pl.items():
     geos=[g for g,r in v]
     out=[]
-    for gc in split1d(geos, SPAN, 5):
+    for gc in split1d(geos, SPAN, 6):
         glo,ghi=gc.min(),gc.max()
         rs=[r for g,r in v if glo<=g<=ghi]
-        for rc in split1d(rs, RSPAN, 4):
+        for rc in split1d(rs, RSPAN, 6):
             out.append([float(np.median(gc)), float(np.median(rc))])
     # dedupe near-identical
     ded=[]
@@ -51,81 +53,79 @@ json.dump(buckets, open("buckets.json","w"))
 print("total variants:", sum(len(v) for v in buckets.values()))
 
 def runlen(fg, axis):
-    """Per-pixel run length along axis (vectorised)."""
     f=fg.astype(np.int32)
     if axis==1: f=f.T
     H,W=f.shape
     idx=np.arange(H)[:,None]*np.ones((1,W),np.int32)
-    # distance since last zero (top->down)
-    last=np.where(f==0, idx, -1)
-    last=np.maximum.accumulate(last,axis=0)
-    down=idx-last
-    lastr=np.where(f[::-1]==0, idx, -1)
-    lastr=np.maximum.accumulate(lastr,axis=0)
-    up=(idx-lastr)[::-1]
-    rl=down+up-1
-    rl[f==0]=0
+    last=np.where(f==0, idx, -1); last=np.maximum.accumulate(last,axis=0); down=idx-last
+    lastr=np.where(f[::-1]==0, idx, -1); lastr=np.maximum.accumulate(lastr,axis=0); up=(idx-lastr)[::-1]
+    rl=down+up-1; rl[f==0]=0
     return rl if axis==0 else rl.T
 
-def dir_widths(fg):
-    """(vertical-stroke width, horizontal-stroke width) in px."""
-    if fg.sum()<8: return 0.0,0.0
-    h=runlen(fg,1)      # horizontal run length (width of vertical strokes)
-    v=runlen(fg,0)
-    vm=fg&(h<v); hm=fg&(v<=h)
-    wv=float(np.median(h[vm])) if vm.sum()>20 else 0.0
-    wh=float(np.median(v[hm])) if hm.sum()>20 else 0.0
-    if not wv: wv=wh
-    if not wh: wh=wv
-    return wv,wh
+def stroke_w(fg):
+    if fg.sum()<8: return 0.0
+    dt=ndimage.distance_transform_edt(fg)
+    return 4*float(np.median(dt[fg]))
 
-def morph(fg, ex, ey, dilate=False):
-    """Elliptical erode/dilate by (ex,ey) px (either may be 0)."""
-    ex=max(ex,1e-6); ey=max(ey,1e-6)
-    if dilate:
-        dt=ndimage.distance_transform_edt(~fg, sampling=(1.0/ey,1.0/ex))
-        return dt<=1.0
-    dt=ndimage.distance_transform_edt(fg, sampling=(1.0/ey,1.0/ex))
-    return dt>1.0
+def bounded_gap(fg):
+    """Smallest typical internal background gap (px) — fusion guard."""
+    bg=~fg
+    vals=[]
+    for axis in (0,1):
+        f=fg if axis==0 else fg.T
+        cum_d=np.maximum.accumulate(f,axis=0)            # ink somewhere above
+        cum_u=np.maximum.accumulate(f[::-1],axis=0)[::-1] # ink somewhere below
+        bounded=(~f)&cum_d&cum_u
+        if axis==1: bounded=bounded.T
+        rl=runlen(bg,axis)
+        g=rl[bounded]
+        g=g[g>0]
+        if len(g)>50: vals.append(float(np.percentile(g,25)))
+    return min(vals) if vals else 1e9
 
-def adjust_dir(fg0, thx, thy):
-    """Iteratively hit half-widths thx (vertical strokes) / thy (horizontal)."""
+def adjust_iso(fg0, th):
+    """Erode/dilate isotropically to stroke half-width th (px), guarding fusion."""
     fg0=np.pad(fg0,PAD)
-    cx=cy=0.0; cur=fg0
+    cap=max(8.0, 0.42*bounded_gap(fg0))
+    dt_in=ndimage.distance_transform_edt(fg0)
+    dt_out=ndimage.distance_transform_edt(~fg0)
+    c=0.0; cur=fg0
     for _ in range(5):
-        wv,wh=dir_widths(cur)
-        ex=wv/2-thx; ey=wh/2-thy
-        if abs(ex)<=0.3 and abs(ey)<=0.3: break
-        cx+=ex; cy+=ey
-        cx=max(min(cx, 60), -MAX_DILATE); cy=max(min(cy, 60), -MAX_DILATE)
-        cur=fg0
-        if cx>0.2 or cy>0.2:
-            cur=morph(cur, max(cx,0.01), max(cy,0.01))
-            if cur.sum()<0.18*fg0.sum():          # don't dissolve
-                cx*=0.5; cy*=0.5
-                cur=morph(fg0, max(cx,0.01), max(cy,0.01))
-        if cx<-0.2 or cy<-0.2:
-            cur=morph(cur, max(-cx,0.01), max(-cy,0.01), dilate=True) | cur
+        h=stroke_w(cur)/2.0
+        e=h-th
+        if abs(e)<=0.35: break
+        c+=e
+        c=max(min(c,60.0), -cap)
+        if c>=0:
+            nxt=dt_in>c
+            if nxt.sum()<0.2*fg0.sum(): c*=0.5; nxt=dt_in>c
+            cur=nxt
+        else:
+            cur=(dt_out<=-c)
     return cur
 
-def emit(out_name, fg, thx, thy):
-    out=adjust_dir(fg, thx, thy)
+def emit(out_name, fg, th):
+    out=adjust_iso(fg, th)
+    if not out.any():
+        out=np.pad(fg,PAD)                     # never dissolve: keep the source
     ys,xs=np.where(out)
     out=out[ys.min():ys.max()+1, xs.min():xs.max()+1]
     Image.fromarray(np.where(out,0,255).astype(np.uint8)).save(f"{OUT}/{out_name}.png")
 
+Q=1.0     # final-space raster: 1 px per em
 n=0
 for gid,m in meta.items():
     a=np.asarray(Image.open(f"glyphs/{gid}.png").convert('L')); fg=a<128
-    H=fg.shape[0]
+    H,W=fg.shape
     if m['role']=='uni':
         nx0,ny0,nx1,ny1=m['box_rel']; boxperpx=(ny1-ny0)/H
-        th=(T_EM/(boxperpx*S*eff_f(gid)))/2.0
-        emit(gid, fg, th, th); n+=1
+        emit(gid, fg, (T_EM/(boxperpx*S*eff_f(gid)))/2.0); n+=1
     else:
-        B=T_EM*GID_BOOST.get(gid,1.0)
-        for k,(g,r) in enumerate(buckets[gid]):
+        for k,(g,r) in enumerate(buckets.get(gid,[])):
             bx=g*(r**0.5); by=g/(r**0.5)
-            sx=bx*1000.0/H; sy=by*1000.0/H      # em per px in each direction
-            emit(f"{gid}_{k}", fg, (B/sx)/2.0, (B/sy)/2.0); n+=1
-print(f"normalized -> {n} bitmaps (2D scale+ratio buckets, directional weight)")
+            sx=bx*1000.0/H; sy=by*1000.0/H      # em per px per direction
+            Wp=max(3,round(W*sx*Q)); Hp=max(3,round(H*sy*Q))
+            im=Image.fromarray(np.where(fg,0,255).astype(np.uint8)).resize((Wp,Hp), Image.LANCZOS)
+            fgs=np.asarray(im)<128
+            emit(f"{gid}_{k}", fgs, (T_EM*Q)/2.0); n+=1
+print(f"normalized -> {n} bitmaps (final-space pre-stretch, isotropic weight)")

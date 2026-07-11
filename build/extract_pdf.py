@@ -85,37 +85,80 @@ json.dump(meta,open("meta.json","w"),ensure_ascii=False)
 print(f"cells assigned={len(assign)} with-ink={nink} empty={sum(1 for r in meta.values() if r['empty'])}")
 print("empty:",[k for k,r in meta.items() if r['empty']])
 
-# ---- post-fix: close the internal gap in mix vowels (ㅘㅙㅚㅝㅞㅟㅢ) ----
-# the drawn right bar sits far from the ㅗ/ㅜ/ㅡ base; pull it in so the bar
-# doesn't float at the end of the syllable.
-def _close_mix_gap(path, maxgap=0.11):
+# ---- decompose mix vowels (ㅘㅙㅚㅝㅞㅟㅢ) into base (ㅗ/ㅜ/ㅡ) + right bar ----
+# split at the most balanced wide column gap; each part becomes its own glyph
+# so composition can place them independently (base under the initial, bar right).
+def _split_mix(i):
+    path=f"glyphs/jung{i:02d}.png"
+    if not os.path.exists(path): return False
     im=np.asarray(Image.open(path).convert('L')); ink=im<128
     H,W=ink.shape
-    cols=ink.any(axis=0)
-    runs=[]; i=0
-    while i<W:
-        if cols[i]:
-            j=i
+    def tight(a):
+        ys,xs=np.where(a)
+        return a[ys.min():ys.max()+1, xs.min():xs.max()+1]
+    def bars_in(a):
+        """tall columns in the right part of a mask (a base must have none)"""
+        if not a.any(): return True
+        aa=tight(a); h,w=aa.shape
+        ysi=np.arange(h)[:,None]
+        cols=aa.any(axis=0)
+        top=np.where(aa, ysi, h).min(axis=0); bot=np.where(aa, ysi, -1).max(axis=0)
+        colh=np.where(cols, bot-top+1, 0)
+        return bool(((colh>=0.72*h)&(np.arange(w)>=0.55*w)).any())
+    def save(base,bar):
+        Image.fromarray(np.where(tight(base),0,255).astype(np.uint8)).save(f"glyphs/jung{i:02d}_base.png")
+        Image.fromarray(np.where(tight(bar),0,255).astype(np.uint8)).save(f"glyphs/jung{i:02d}_bar.png")
+        return True
+    # 1) balanced column gap
+    cols=ink.any(axis=0); runs=[]; x=0
+    while x<W:
+        if cols[x]:
+            j=x
             while j<W and cols[j]: j+=1
-            runs.append((i,j)); i=j
-        else: i+=1
-    if len(runs)<2: return False
-    gaps=[(runs[k+1][0]-runs[k][1],k) for k in range(len(runs)-1)]
-    g,k=max(gaps)
-    if g <= maxgap*W: return False
-    newg=int(maxgap*W)
-    shift=g-newg
-    cut=runs[k][1]
-    out=np.zeros((H,W-shift),bool)
-    out[:, :cut]=ink[:, :cut]
-    out[:, cut+newg- (runs[k+1][0]-cut-shift) if False else cut:]=False
-    right=ink[:, runs[k+1][0]:]
-    out[:, runs[k+1][0]-shift:runs[k+1][0]-shift+right.shape[1]]|=right
-    Image.fromarray(np.where(out,0,255).astype(np.uint8)).save(path)
-    return True
-
+            runs.append((x,j)); x=j
+        else: x+=1
+    if len(runs)>=2:
+        inkw=sum(b-a for a,b in runs); best=None
+        for k in range(len(runs)-1):
+            gap=runs[k+1][0]-runs[k][1]
+            if gap < 0.04*W: continue
+            left=sum(b-a for a,b in runs[:k+1])/inkw
+            bal=min(left,1-left)
+            if best is None or bal>best[0]: best=(bal,k)
+        if best:
+            k=best[1]
+            base,bar=ink[:, :runs[k][1]], ink[:, runs[k+1][0]:]
+            if not bars_in(base): return save(base,bar)
+    # 2) connected components: tall right components form the bar
+    from scipy import ndimage as _ndi
+    lab,n=_ndi.label(ink)
+    if n>=2:
+        barmask=np.zeros_like(ink)
+        for c in range(1,n+1):
+            ys,xs=np.where(lab==c)
+            if (ys.max()-ys.min()+1)>=0.55*H and xs.mean()>=0.5*W:
+                barmask|=(lab==c)
+        if barmask.any() and barmask.sum()<ink.sum():
+            base=ink&~barmask
+            if not bars_in(base): return save(base,barmask)
+    # 3) cut before the leftmost tall column right of centre (ㅘㅙㅚㅞ)
+    ysi=np.arange(H)[:,None]
+    top=np.where(ink, ysi, H).min(axis=0); bot=np.where(ink, ysi, -1).max(axis=0)
+    colh=np.where(cols, bot-top+1, 0)
+    tall=np.where((colh>=0.70*H)&(np.arange(W)>=0.40*W))[0]
+    if len(tall)==0: return False
+    cut=max(int(tall.min())-2, 1)
+    return save(ink[:, :cut], ink[:, cut:])
 if __name__=='__main__' or True:
+    import json as _j
+    meta2=_j.load(open("meta.json"))
     for i in (9,10,11,14,15,16,19):     # ㅘㅙㅚㅝㅞㅟㅢ
-        p=f"glyphs/jung{i:02d}.png"
-        if os.path.exists(p):
-            print("mix-gap fix", p, _close_mix_gap(p))
+        ok=_split_mix(i)
+        print("mix split", i, ok)
+        if ok:
+            src=meta2[f"jung{i:02d}"]
+            for part in ("base","bar"):
+                meta2[f"jung{i:02d}_{part}"]=dict(page=src["page"],role="jung",cp=src["cp"],
+                                                  char=src["char"],empty=False,
+                                                  box_rel=src["box_rel"],ink_px=src["ink_px"])
+    _j.dump(meta2, open("meta.json","w"), ensure_ascii=False)

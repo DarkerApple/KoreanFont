@@ -19,7 +19,7 @@ def vtype(j): return 'vert' if j in VERT else ('horz' if j in HORZ else 'mix')
 def zones(jung, has_jong):
     vt=vtype(jung)
     if not has_jong:
-        if vt=='vert': return dict(cho=(.02,.12,.52,.76), jung=(.53,.02,.45,.96))
+        if vt=='vert': return dict(cho=(.02,.09,.52,.80), jung=(.53,.02,.45,.96))
         if vt=='horz': return dict(cho=(.04,.02,.92,.54), jung=(.04,.56,.92,.42))
         return dict(cho=(.01,.01,.56,.61), jung=(.05,.03,.89,.95))   # mix
     else:
@@ -53,6 +53,49 @@ def select_variant(gid, zone, fill, align, free=False):
     vg=f"{gid}_{k}"
     return vg if vg in traces else gid
 
+def select_by(gid, bx, by):
+    """Variant selection from final base-relative scales."""
+    B=_B.get(gid)
+    if not B: return gid
+    import math
+    g=(bx*by)**0.5; r=bx/by
+    def dist(b):
+        gb,rb=(b if isinstance(b,(list,tuple)) else (b,1.0))
+        return abs(math.log(g/gb))+0.7*abs(math.log(r/rb))
+    k=min(range(len(B)), key=lambda i:dist(B[i]))
+    vg=f"{gid}_{k}"
+    return vg if vg in traces else gid
+
+def raw_dims(gid):
+    t=traces.get('raw_'+gid) or T(gid)
+    return t[0], t[1]
+
+def fit_box(gid, x0, y0, x1, y1, uniform=False, ax=0.5, ay=0.5):
+    """Place gid into the em box; free anisotropic fill unless uniform.
+    Returns a component tuple (name, bx, by, dx, dy)."""
+    W,H=raw_dims(gid)
+    wu=W*1000.0/H                      # base-glyph width units (height=1000)
+    bw,bh=x1-x0, y1-y0
+    if uniform:
+        s=min(bw/wu, bh/1000.0); bx=by=s
+    else:
+        bx=bw/wu; by=bh/1000.0
+        if bx/by>AFREE: bx=by*AFREE
+        if by/bx>AFREE: by=bx*AFREE
+    vg=select_by(gid,bx,by)
+    Wv,Hv,_=T(vg)
+    wuv=Wv*1000.0/Hv
+    bx2=min(bx*wu/wuv, bw/wuv)         # variant dims correction, stay inside box
+    embw=wuv*bx2; embh=1000.0*by
+    dx=x0+(bw-embw)*ax; dy=y0+(bh-embh)*ay
+    return base_name(vg), bx2, by, dx, dy
+
+def comp_span(c):
+    name,bx,by,dx,dy=c
+    gid=name.replace('jamo_','')
+    W,H,_=T(gid)
+    return dx, dx+W*(1000.0/H)*bx, dy, dy+1000.0*by   # l,r,b,t
+
 def optical_fill(gid, fill):
     """Adapt each jamo's size to its complexity: simple consonants (ㄱㄴㅅ…)
     slightly smaller, complex ones (ㅃㅄ…) use the full zone."""
@@ -64,7 +107,7 @@ def optical_fill(gid, fill):
 
 # per-role stretch policy: (h_min,h_max) as zone fraction, max vertical
 # anisotropy A, max width overstretch WCAP (x uniform fit)
-POLICY={'cho':((0.78,0.97),1.80,1.15), 'jong':((0.80,0.99),1.30,1.05)}
+POLICY={'cho':((0.82,0.99),1.80,1.15), 'jong':((0.80,0.99),1.30,1.05)}
 
 RING_A=1.35           # ㅇ stretches toward its zone's aspect (per vowel direction)
 
@@ -201,43 +244,89 @@ def _ink_span(comps):
 def compose_components(cho_i, jung_i, jong_full):
     has=jong_full>0
     z=zones(jung_i, has); vt=vtype(jung_i)
-    comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt),
-                     free=(vt=='mix'))]
-    jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
-    if vt=='vert':
-        # couple the vowel bar to the initial, with a floor so narrow bodies
-        # (이/비) keep a commercial-consistent syllable width
-        _,cmaxx=_ink_span(comps)
+    if vt=='mix':
+        comps=_compose_mix(cho_i, jung_i, jong_full, has)
+    elif vt=='vert':
+        comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt))]
+        jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
+        _,cmaxx,_,_=_spans(comps)
         name,bx,by,dx,dy=jc
         gid=name.replace('jamo_',''); W,H,_=T(gid)
         jw=W*(1000.0/H)*bx
         BAR_MIN=SQ_L+0.72*SQW
         nx=min(max(cmaxx+COUPLE, BAR_MIN), SQ_R-jw)
-        jc=(name,bx,by,nx,dy)
-    if vt=='horz':
-        # chain the stack vertically: vowel top tucks to the cho bottom
-        VG1=-15                                  # slight overlap, like commercial
-        name,bx,by,dx,dy=jc
-        cho_bottom=comps[0][4]
-        jc=(name,bx,by,dx, cho_bottom+VG1-1000*by)
-    comps.append(jc)
-    if has:
-        jz=jong_zone(jong_full-1, z['jong'])
-        jg=component("jong%02d"%(jong_full-1), jz, ROLE_FIT['jong'], align_for('jong',vt))
-        if vt=='horz':
-            VG2=30
-            n2,bx2,by2,dx2,dy2=jg
-            anchor_bottom=dy2                    # keep the block's bottom fixed
-            jung_bottom=jc[4]
-            jg=(n2,bx2,by2,dx2, jung_bottom-VG2-1000*by2)
-            lift=anchor_bottom-jg[4]             # shift the whole stack down to the anchor
-            comps=[(n,bx,by,dx,dy+lift) for (n,bx,by,dx,dy) in comps]
-            jg=(n2,bx2,by2,dx2,anchor_bottom)
-        comps.append(jg)
-    # optical centring of the whole syllable in its fixed advance
-    mn,mx=_ink_span(comps)
+        comps.append((name,bx,by,nx,dy))
+        if has:
+            comps.append(component("jong%02d"%(jong_full-1),
+                         jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong',vt)))
+    else:   # horz: vowel anchored, the initial fills everything above it (rule 2)
+        jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
+        _,_,jb,jt=comp_span(jc)
+        top=SQ_T-.02*SQH
+        cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt-15, SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
+        comps=[cho,jc]
+        if has:
+            comps.append(component("jong%02d"%(jong_full-1),
+                         jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong',vt)))
+    # ---- uniform block: normalise ink width, then centre in the advance ----
+    mn,mx,_,_=_spans(comps)
+    w=mx-mn; W_T=0.90*SQW
+    f=min(max(W_T/w, 0.94), 1.10)
+    if abs(f-1.0)>0.02:
+        comps=[(n,bx*f,by,mn+(dx-mn)*f,dy) for (n,bx,by,dx,dy) in comps]
+        mn,mx,_,_=_spans(comps)
     shift=(ADV-(mx-mn))/2.0 - mn
-    comps=[(n,bx,by,dx+shift,dy) for (n,bx,by,dx,dy) in comps]
+    return [(n,bx,by,dx+shift,dy) for (n,bx,by,dx,dy) in comps]
+
+def _spans(comps):
+    ls,rs,bs,ts=[],[],[],[]
+    for c in comps:
+        l,r,b,t=comp_span(c)
+        ls.append(l); rs.append(r); bs.append(b); ts.append(t)
+    return min(ls),max(rs),min(bs),max(ts)
+
+def _compose_mix(cho_i, jung_i, jong_full, has):
+    """Decomposed compound vowel: base (ㅗ/ㅜ/ㅡ) under the initial, bar right."""
+    gb=f"jung{jung_i:02d}_base"; gr=f"jung{jung_i:02d}_bar"
+    if ('raw_'+gb) not in traces and gb not in traces:      # fallback: whole glyph
+        z=zones(jung_i, has)
+        comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho','mix'), free=True),
+               component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung','mix'))]
+        if has:
+            comps.append(component("jong%02d"%(jong_full-1),
+                         jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong','mix')))
+        return comps
+    # vertical budget (fractions of SQH, from the top)
+    if has: cho_h, base_h, jong_y = .40, .175, .615
+    else:   cho_h, base_h, jong_y = .46, .21, None
+    top=SQ_T-.02*SQH
+    # initial: top-left, free fill
+    cho=fit_box("cho%02d"%cho_i, SQ_L+.02*SQW, top-cho_h*SQH, SQ_L+.56*SQW, top, ax=0.35, ay=0.4)
+    comps=[cho]
+    cl,cr,cb,ct=comp_span(cho)
+    # base: width follows the initial (stem tucked inside its footprint)
+    bw=(cr-cl)*1.12
+    bx0=max(SQ_L+.01*SQW, cl-(bw-(cr-cl))/2.0)
+    btop=cb+14                                           # slight tuck under the cho
+    base=fit_box(gb, bx0, btop-base_h*SQH, bx0+bw, btop)
+    comps.append(base)
+    # bar: right, coupled with floor, spanning the body height
+    _,bmax,_,_=_spans(comps)
+    bar_top=top
+    bar_bot=(SQ_T-(jong_y-.02)*SQH) if has else (SQ_B+18)
+    W,H=raw_dims(gr); wu=W*1000.0/H
+    by=(bar_top-bar_bot)/1000.0
+    bxs=by                                              # bars keep natural aspect
+    vg=select_by(gr,bxs,by)
+    Wv,Hv,_=T(vg); wuv=Wv*1000.0/Hv
+    jw=wuv*bxs
+    BAR_MIN=SQ_L+0.72*SQW
+    nx=min(max(bmax+COUPLE, BAR_MIN), SQ_R-jw)
+    comps.append((base_name(vg), bxs, by, nx, bar_bot))
+    if has:
+        z=zones(jung_i, True)
+        comps.append(component("jong%02d"%(jong_full-1),
+                     jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong','mix')))
     return comps
 
 # standalone jamo (for compatibility-jamo codepoints): centred in the square

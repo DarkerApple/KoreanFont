@@ -112,6 +112,7 @@ def build(family, out, include_korean):
         import json as _json
         buckets=_json.load(open("buckets.json"))
         basegids=[f"{g}_{k}" for g,c in sorted(buckets.items()) for k in range(len(c))]
+        basegids+=[f"jung{i:02d}" for i in (9,10,11,14,15,16,19)]   # whole compound vowels (compat jamo)
         for gid in basegids:
             nm=hangul.base_name(gid)
             glyphs[nm]=glyph_from_em(hangul.base_contours(gid)); hmtx[nm]=(1000,0)
