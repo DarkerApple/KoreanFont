@@ -23,10 +23,10 @@ def zones(jung, has_jong):
         if vt=='horz': return dict(cho=(.04,.02,.92,.54), jung=(.04,.56,.92,.42))
         return dict(cho=(.02,.02,.43,.46), jung=(.05,.03,.93,.95))   # mix
     else:
-        # batchim gets a big band: zone height .39 of the square
-        if vt=='vert': return dict(cho=(.02,.02,.50,.56), jung=(.53,.02,.45,.56), jong=(.06,.60,.88,.39))
-        if vt=='horz': return dict(cho=(.05,.02,.90,.30), jung=(.04,.33,.92,.25), jong=(.06,.60,.88,.39))
-        return dict(cho=(.02,.02,.40,.38), jung=(.27,.02,.71,.57), jong=(.06,.60,.88,.39))  # mix
+        # batchim band sits close under the body
+        if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.54), jong=(.06,.575,.88,.385))
+        if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.405,.92,.20), jong=(.06,.62,.88,.35))
+        return dict(cho=(.02,.02,.42,.38), jung=(.27,.02,.71,.57), jong=(.06,.60,.88,.375))  # mix
 
 # per-role fill factor and alignment (ax,ay in 0..1; .5=center)
 ROLE_FIT={'cho':0.96,'jung':0.96,'jong':1.0}
@@ -63,20 +63,30 @@ def optical_fill(gid, fill):
 # anisotropy A, max width overstretch WCAP (x uniform fit)
 POLICY={'cho':((0.78,0.97),1.80,1.15), 'jong':((0.80,0.99),1.30,1.05)}
 
+RING_A=1.35           # ㅇ stretches toward its zone's aspect (per vowel direction)
+
 def _scales_for(gid, zone, fill):
     W,H,cs=T(gid)
     zx,zy,zw,zh=zone
     zwe=zw*SQW; zhe=zh*SQH
+    if gid.startswith('cho11'): fill*=0.92        # ring slightly smaller overall
     sx0=fill*zwe/W; sy0=fill*zhe/H
     sc=min(sx0,sy0)
     role='cho' if gid.startswith('cho') else 'jong' if gid.startswith('jong') else 'jung'
-    if role=='jung': return sc,sc
+    if gid.startswith('cho11'):                   # ㅇ: ellipse follows zone shape
+        return min(sx0, sc*RING_A), min(sy0, sc*RING_A)
+    if role=='jung':
+        if zwe>1.8*zhe:                           # flat vowels (ㅗㅜㅡ…) span the width
+            return min(sx0, sc*1.6), sc
+        return sc,sc
     (fmin,fmax),A,WCAP=POLICY[role]
     tmin,tmax=fmin*zhe,fmax*zhe
     sy=sc
     if H*sy<tmin: sy=min(tmin/H, sc*A, sy0)      # stretch short/wide consonants taller
     if H*sy>tmax: sy=tmax/H                       # cap tall ones (e.g. the ㅇ ring)
-    sx=min(sx0, sc*WCAP, sy*A)                    # width near its drawn proportion
+    wcap=sc*WCAP
+    if zwe>1.8*zhe: wcap=sc*1.9                   # wide-flat zone (horz-vowel context)
+    sx=min(sx0, wcap, sy*A)                       # width follows the zone
     sx=max(sx, min(sy/A, sx0))
     return sx,sy
 
@@ -146,7 +156,7 @@ def align_for(role, vt):
         if vt=='vert': return (0.85,0.5)     # bar toward the right edge (commercial)
         if vt=='horz': return (0.5,0.6)
         return (0.72,0.55)
-    return (0.5,0.7)  # jong: center, lower
+    return (0.5,0.38) # jong: hug the body above
 
 # 0-based indices into JONG that are two-consonant clusters (wide finals)
 COMPOUND_JONG={2,4,5,8,9,10,11,12,13,14,17}
