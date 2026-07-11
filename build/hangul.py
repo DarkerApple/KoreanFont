@@ -21,12 +21,12 @@ def zones(jung, has_jong):
     if not has_jong:
         if vt=='vert': return dict(cho=(.02,.12,.52,.76), jung=(.53,.02,.45,.96))
         if vt=='horz': return dict(cho=(.04,.02,.92,.54), jung=(.04,.56,.92,.42))
-        return dict(cho=(.02,.02,.47,.52), jung=(.05,.03,.89,.95))   # mix
+        return dict(cho=(.01,.02,.52,.57), jung=(.05,.03,.89,.95))   # mix
     else:
         # batchim band sits close under the body
         if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.54), jong=(.06,.56,.88,.385))
         if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.40,.92,.20), jong=(.06,.605,.88,.35))
-        return dict(cho=(.02,.02,.45,.42), jung=(.27,.02,.68,.57), jong=(.06,.585,.88,.375))  # mix
+        return dict(cho=(.01,.02,.49,.46), jung=(.27,.02,.68,.57), jong=(.06,.585,.88,.375))  # mix
 
 # per-role fill factor and alignment (ax,ay in 0..1; .5=center)
 ROLE_FIT={'cho':0.96,'jung':0.96,'jong':1.0}
@@ -155,7 +155,7 @@ def align_for(role, vt):
     if role=='cho':
         if vt=='vert': return (0.42,0.50)   # centred on the vowel bar
         if vt=='horz': return (0.5,0.80)     # sink toward the vowel below
-        return (0.35,0.55)
+        return (0.08,0.55)   # mix: hug the left edge
     if role=='jung':
         if vt=='vert': return (0.85,0.5)     # bar toward the right edge (commercial)
         if vt=='horz': return (0.5,0.6)
