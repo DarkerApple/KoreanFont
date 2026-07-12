@@ -118,6 +118,10 @@ def emit(out_name, fg, th):
     Image.fromarray(np.where(out,0,255).astype(np.uint8)).save(f"{OUT}/{out_name}.png")
 
 Q=1.0     # final-space raster: 1 px per em
+# multi-deck glyphs (detached tick / stacked bars): stroke is capped to a
+# fraction of the rendered height so the decks stay separable at small scales
+STRUCT_CAP={'cho14':0.18,'cho18':0.19,'cho12':0.22,'cho13':0.20,
+            'jong22':0.22,'jong23':0.18,'jong26':0.19,'jong04':0.20}
 n=0
 for gid,m in meta.items():
     a=np.asarray(Image.open(f"glyphs/{gid}.png").convert('L')); fg=a<128
@@ -132,5 +136,7 @@ for gid,m in meta.items():
             Wp=max(3,round(W*sx*Q)); Hp=max(3,round(H*sy*Q))
             im=Image.fromarray(np.where(fg,0,255).astype(np.uint8)).resize((Wp,Hp), Image.LANCZOS)
             fgs=np.asarray(im)<128
-            emit(f"{gid}_{k}", fgs, (T_EM*GID_BOOST.get(gid,1.0)*Q)/2.0); n+=1
+            th_em=T_EM*GID_BOOST.get(gid,1.0)
+            if gid in STRUCT_CAP: th_em=min(th_em, STRUCT_CAP[gid]*Hp)
+            emit(f"{gid}_{k}", fgs, (th_em*Q)/2.0); n+=1
 print(f"normalized -> {n} bitmaps (final-space pre-stretch, isotropic weight)")

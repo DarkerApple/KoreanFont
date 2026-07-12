@@ -145,16 +145,21 @@ def _tick():
     return ink[ys.min():ys.max()+1, xs.min():xs.max()+1]
 
 def print_chieut(z):
+    """ㅊ = ㅈ + tick. The tick is drawn at full stroke thickness with a
+    wide gap so it stays distinct when the glyph is compressed (초/추)."""
+    H0,W=z.shape
     t=_tick()
-    if t is None:
-        th=max(4,z.shape[0]//12); tw=z.shape[1]//3
+    tw=int(W*0.36); th=max(5,int(round(H0*0.12)))
+    if t is not None:
+        t=_resize_mask(t, tw, th)
+    else:
         t=np.ones((th,tw),bool)
-    gap=max(3,z.shape[0]//14)
-    H=t.shape[0]+gap+z.shape[0]; W=max(z.shape[1],t.shape[1])
+    gap=max(6,int(round(H0*0.22)))
+    H=t.shape[0]+gap+H0
     out=np.zeros((H,W),bool)
     tx=(W-t.shape[1])//2
     out[:t.shape[0], tx:tx+t.shape[1]]=t
-    out[t.shape[0]+gap:, (W-z.shape[1])//2:(W-z.shape[1])//2+z.shape[1]]=z
+    out[t.shape[0]+gap:, :]=z
     return out
 
 def _swap_right(gid, z):

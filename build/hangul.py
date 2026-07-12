@@ -298,14 +298,15 @@ def compose_components(cho_i, jung_i, jong_full):
         # floor: block stays wide enough for the width normaliser, but a
         # thin ㅣ bar never gets pushed out just to fill the square
         BAR_MIN=min(_spans(comps)[0]+(0.90*SQW)/1.08-jw,
-                    SQ_L+(0.67 if jung_i==20 else 0.62)*SQW)
+                    SQ_L+(0.69 if jung_i==20 else 0.62)*SQW)
         nx=min(max(lo, BAR_MIN), SQ_R-jw)
         comps.append((name,bx,by,nx,dy))
         if has:
             comps.append(_guard_jong(comps, component("jong%02d"%(jong_full-1),
                          jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong',vt))))
     else:   # horz: vowel anchored, the initial fills everything above it (rule 2)
-        jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
+        ja=(0.5, 0.62 if has else 0.88)   # no-jong: vowel sits low so the
+        jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], ja)  # block fills the square
         _,_,jb,jt=comp_span(jc)
         top=SQ_T-.02*SQH
         cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt+(55 if has else 60), SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
