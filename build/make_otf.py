@@ -21,18 +21,19 @@ def to_otf(src, dst):
     fb.setupGlyphOrder(order)
     fb.setupCharacterMap({cp:g for cp,g in f.getBestCmap().items()})
     fb.setupCFF(ps, {'FullName':f['name'].getDebugName(4),'FamilyName':fam,
-                     'Weight':'Regular'}, charstrings, {})
+                     'Weight':f['name'].getDebugName(2) or 'Regular'}, charstrings, {})
     fb.setupHorizontalMetrics({g:hmtx[g] for g in order})
     hh=f['hhea']
     fb.setupHorizontalHeader(ascent=hh.ascent, descent=hh.descent, lineGap=hh.lineGap)
     n=f['name']
-    fb.setupNameTable({"familyName":fam,"styleName":"Regular",
+    fb.setupNameTable({"familyName":fam,"styleName":f['name'].getDebugName(2) or "Regular",
         "uniqueFontIdentifier":n.getDebugName(3),"fullName":n.getDebugName(4),
         "version":n.getDebugName(5),"psName":ps,"manufacturer":"Built from handwriting"})
     o=f['OS/2']
     fb.setupOS2(sTypoAscender=o.sTypoAscender,sTypoDescender=o.sTypoDescender,
         sTypoLineGap=o.sTypoLineGap,usWinAscent=o.usWinAscent,usWinDescent=o.usWinDescent,
-        sxHeight=o.sxHeight,sCapHeight=o.sCapHeight,achVendID=o.achVendID,fsType=o.fsType)
+        sxHeight=o.sxHeight,sCapHeight=o.sCapHeight,achVendID=o.achVendID,fsType=o.fsType,
+        usWeightClass=o.usWeightClass)
     fb.setupPost()
     fb.font['head'].fontRevision=f['head'].fontRevision
     import os
@@ -44,5 +45,7 @@ def to_otf(src, dst):
     fb.font.save(dst)
     import os; print(f"{dst}: {len(order)} glyphs {os.path.getsize(dst)/1e6:.2f}MB {time.time()-t0:.1f}s")
 
-to_otf("Lightheaded-Regular.ttf","Lightheaded-Regular.otf")
-to_otf("Lightheaded-Latin-Regular.ttf","Lightheaded-Latin-Regular.otf")
+import sys, os as _os
+_targets=sys.argv[1:] or ["Lightheaded-Regular.ttf","Lightheaded-Latin-Regular.ttf"]
+for _t in _targets:
+    to_otf(_t, _t.replace(".ttf",".otf"))

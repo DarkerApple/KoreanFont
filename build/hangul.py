@@ -82,7 +82,7 @@ def fit_box(gid, x0, y0, x1, y1, uniform=False, ax=0.5, ay=0.5, acap=None):
         s=min(bw/wu, bh/1000.0); bx=by=s
     else:
         bx=bw/wu; by=bh/1000.0
-        cap=acap or (1.85 if gid.startswith('cho11') else AFREE)  # rings stay ring-like
+        cap=acap or GID_ACAP.get(gid.split('_')[0], AFREE)
         if bx/by>cap: bx=by*cap
         if by/bx>cap: by=bx*cap
     vg=select_by(gid,bx,by)
@@ -115,6 +115,9 @@ POLICY={'cho':((0.82,0.99),1.80,1.15), 'jong':((0.80,0.99),1.30,1.05)}
 RING_A=1.35           # ㅇ stretches toward its zone's aspect (per vowel direction)
 
 AFREE=2.6            # loose anisotropy cap in free-fit mode
+# per-jamo distortion limits: ㅇ stays ring-like, ㄹ keeps its drawn
+# proportions (the user's ㄹ, scaled — never redrawn)
+GID_ACAP={'cho11':1.85, 'cho05':1.35, 'jong07':1.35}
 
 def _scales_for(gid, zone, fill, trace_key=None, free=False):
     W,H,cs=T(trace_key or gid)
@@ -133,6 +136,7 @@ def _scales_for(gid, zone, fill, trace_key=None, free=False):
             return min(sx0, sc*2.1), sc
         return sc,sc
     (fmin,fmax),A,WCAP=POLICY[role]
+    A=min(A, GID_ACAP.get(gid.split('_')[0], A))
     tmin,tmax=fmin*zhe,fmax*zhe
     sy=sc
     if H*sy<tmin: sy=min(tmin/H, sc*A, sy0)      # stretch short/wide consonants taller
@@ -298,7 +302,7 @@ def compose_components(cho_i, jung_i, jong_full):
         # floor: block stays wide enough for the width normaliser, but a
         # thin ㅣ bar never gets pushed out just to fill the square
         BAR_MIN=min(_spans(comps)[0]+(0.90*SQW)/1.08-jw,
-                    SQ_L+(0.69 if jung_i==20 else 0.62)*SQW)
+                    SQ_L+(0.72 if jung_i==20 else 0.62)*SQW)
         nx=min(max(lo, BAR_MIN), SQ_R-jw)
         comps.append((name,bx,by,nx,dy))
         if has:
@@ -317,14 +321,21 @@ def compose_components(cho_i, jung_i, jong_full):
     # ---- uniform block: normalise ink width, then centre in the advance ----
     mn,mx,_,_=_spans(comps)
     w=mx-mn; W_T=0.90*SQW
-    f=min(max(W_T/w, 0.94), 1.10)
+    f=min(max(W_T/w, 0.96), 1.10)
     if abs(f-1.0)>0.02:
         comps=[(n,bx*f,by,mn+(dx-mn)*f,dy) for (n,bx,by,dx,dy) in comps]
         mn,mx,_,_=_spans(comps)
     shift=(ADV-(mx-mn))/2.0 - mn
     comps=[(n,bx,by,dx+shift,dy) for (n,bx,by,dx,dy) in comps]
-    # ---- optical vertical centring: all blocks share one axis (no row wobble)
+    # ---- uniform block height: pull outliers toward one size ----
     _,_,bm,tm=_spans(comps)
+    h=tm-bm; H_T=0.92*SQH
+    fy=min(max(H_T/h, 0.94), 1.06)
+    if abs(fy-1.0)>0.02:
+        cy=(tm+bm)/2.0
+        comps=[(n,bx,by*fy,dx,cy+(dy-cy)*fy) for (n,bx,by,dx,dy) in comps]
+        _,_,bm,tm=_spans(comps)
+    # ---- optical vertical centring: all blocks share one axis (no row wobble)
     MID=(SQ_T+SQ_B)/2.0
     vs=max(-90.0, min(90.0, MID-(tm+bm)/2.0))
     vs=min(vs, SQ_T+8-tm)                    # never poke above the square

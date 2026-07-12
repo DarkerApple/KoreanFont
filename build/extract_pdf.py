@@ -286,12 +286,7 @@ def _swap_left(gid, z):
     out[:, lz.shape[1]+gap:]=right
     _save_g(gid, out)
 
-# formal ㄹ everywhere: cho, jong, and inside the ㄹ-clusters
-_save_g('cho05', formal_rieul('cho00','cho02'))
-_R=formal_rieul('jong00','jong03')
-_save_g('jong07', _R)
-for _g in ('jong08','jong09','jong10','jong11','jong12','jong13','jong14'):
-    _swap_left(_g, _R)
+# ㄹ stays the user's own drawing (scaled differently at composition time)
 
 def hieut_respace(gid):
     """Re-space ㅎ's decks (tick / bar / ring) with clear gaps so they stay

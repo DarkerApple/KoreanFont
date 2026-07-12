@@ -98,3 +98,12 @@ def heatmap(path, chars, cols=28, cell=64):
     im.save(path); print(path, im.size)
 freqs=freq+"까따빠싸짜뚫짧닭않옳읽값웩귀쥐뭘"
 heatmap(f"{OUT}/gray-heatmap.png", freqs)
+
+# 6) weight family showcase
+import os as _os
+if all(_os.path.exists(f"Lightheaded-{s}.ttf") for s in ("Light","Regular","Bold")):
+    sheet(f"{OUT}/weights.png", [
+        ("Lightheaded-Light.ttf",  58,0,"Light    — 가벼운 손글씨 폰트 Lightheaded 0123 Aa"),
+        ("Lightheaded-Regular.ttf",58,0,"Regular — 가벼운 손글씨 폰트 Lightheaded 0123 Aa"),
+        ("Lightheaded-Bold.ttf",   58,0,"Bold     — 가벼운 손글씨 폰트 Lightheaded 0123 Aa"),
+    ])

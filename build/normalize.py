@@ -7,7 +7,7 @@ from fontcommon import S, eff_f
 meta=json.load(open("meta.json"))
 OUT="glyphs_norm"; os.makedirs(OUT, exist_ok=True)
 for _f in os.listdir(OUT): os.remove(os.path.join(OUT,_f))   # no stale variants
-T_EM=80.0        # target final rendered stroke width (em)
+T_EM=float(os.environ.get("LH_TEM","80"))   # target stroke width (em) — weight axis
 # optical-color compensation: compressed multi-part jamo run slightly
 # lighter — mild, so strokes still read as one thickness family
 GID_BOOST={'cho01':0.93,'cho03':0.93,'cho08':0.92,'cho10':0.94,'cho13':0.93,

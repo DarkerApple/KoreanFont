@@ -31,7 +31,7 @@ def shear(cs, s=SLANT):
         out.append(o)
     return out
 
-def build(family, out, include_korean):
+def build(family, out, include_korean, style="Regular", weightclass=400):
     t0=time.time()
     glyphs={'.notdef':notdef_glyph()}; hmtx={'.notdef':(600,60)}; cmap={}
     order=['.notdef','space']; simple=set(['.notdef','space'])
@@ -142,21 +142,27 @@ def build(family, out, include_korean):
     fb.setupGlyphOrder(order); fb.setupCharacterMap(cmap)
     fb.setupGlyf(glyphs); fb.setupHorizontalMetrics(hmtx)
     fb.setupHorizontalHeader(ascent=ASC, descent=DESC, lineGap=120)
-    ps=family.replace(" ","")+"-Regular"
-    fb.setupNameTable({"familyName":family,"styleName":"Regular",
-        "uniqueFontIdentifier":f"{family} {VERSION}","fullName":f"{family} Regular",
+    ps=family.replace(" ","")+"-"+style
+    fb.setupNameTable({"familyName":family,"styleName":style,
+        "uniqueFontIdentifier":f"{family} {style} {VERSION}","fullName":f"{family} {style}",
         "version":f"Version {VERSION}","psName":ps,
         "manufacturer":"Built from handwriting"})
     fb.setupOS2(sTypoAscender=ASC, sTypoDescender=DESC, sTypoLineGap=120,
                 usWinAscent=920, usWinDescent=300, sxHeight=X_H, sCapHeight=CAP_H,
-                achVendID="HAND", fsType=0)
+                achVendID="HAND", fsType=0, usWeightClass=weightclass)
     fb.setupPost(keepGlyphNames=False)
     removeOverlaps(fb.font, glyphNames=simple)
     fb.font['head'].fontRevision=float(VERSION)
+    if style=="Bold":
+        fb.font['head'].macStyle|=0x0001
+        fb.font['OS/2'].fsSelection=(fb.font['OS/2'].fsSelection & ~0x40)|0x20
     fb.font.save(out)
     print(f"{out}: {len(glyphs)} glyphs (syl {nsyl}, compat {ncompat}) "
           f"{os.path.getsize(out)/1e6:.2f}MB  {time.time()-t0:.1f}s")
 
 if __name__=='__main__':
-    build("Lightheaded",       "Lightheaded-Regular.ttf",       include_korean=True)
-    build("Lightheaded Latin", "Lightheaded-Latin-Regular.ttf", include_korean=False)
+    import os as _os
+    STYLE=_os.environ.get("LH_STYLE","Regular")
+    WC={"Light":300,"Regular":400,"Bold":700}[STYLE]
+    build("Lightheaded",       f"Lightheaded-{STYLE}.ttf",       True,  STYLE, WC)
+    build("Lightheaded Latin", f"Lightheaded-Latin-{STYLE}.ttf", False, STYLE, WC)

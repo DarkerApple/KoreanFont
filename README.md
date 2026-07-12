@@ -4,12 +4,14 @@ A light, even-weight **handwriting font built from hand-drawn worksheets** —
 Korean (한글), Latin, digits and symbols — generated automatically from a
 tablet-drawn glyph worksheet (`build/raw/LightheadedRAW.pdf`).
 
-| Download | Coverage | Format |
-|---|---|---|
-| **[`Lightheaded-Regular.ttf`](Lightheaded-Regular.ttf)** | Korean + Latin + symbols | TrueType (recommended, ≈1.1 MB) |
-| **[`Lightheaded-Regular.otf`](Lightheaded-Regular.otf)** | Korean + Latin + symbols | OpenType/CFF (≈29 MB — CFF can't share composed syllables; prefer the TTF) |
-| **[`Lightheaded-Latin-Regular.ttf`](Lightheaded-Latin-Regular.ttf)** | Latin + symbols only | TrueType (≈0.02 MB) |
-| **[`Lightheaded-Latin-Regular.otf`](Lightheaded-Latin-Regular.otf)** | Latin + symbols only | OpenType/CFF |
+| Download | Coverage | Weights | Format |
+|---|---|---|---|
+| **[`Lightheaded-Regular.ttf`](Lightheaded-Regular.ttf)** | Korean + Latin + symbols | [Light](Lightheaded-Light.ttf) · Regular · [Bold](Lightheaded-Bold.ttf) | TrueType (recommended, ≈1.1 MB each) |
+| **[`Lightheaded-Regular.otf`](Lightheaded-Regular.otf)** | Korean + Latin + symbols | Regular | OpenType/CFF (≈29 MB — prefer the TTF) |
+| **[`Lightheaded-Latin-Regular.ttf`](Lightheaded-Latin-Regular.ttf)** | Latin + symbols only | [Light](Lightheaded-Latin-Light.ttf) · Regular · [Bold](Lightheaded-Latin-Bold.ttf) | TrueType (≈0.02 MB) |
+| **[`Lightheaded-Latin-Regular.otf`](Lightheaded-Latin-Regular.otf)** | Latin + symbols only | [Light](Lightheaded-Latin-Light.otf) · Regular · [Bold](Lightheaded-Latin-Bold.otf) | OpenType/CFF |
+
+![weights](samples/weights.png)
 
 ![paragraph sample](samples/paragraph.png)
 
