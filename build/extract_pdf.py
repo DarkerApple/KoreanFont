@@ -230,8 +230,14 @@ def tieut_from_dieut(dgid):
     row=d[int(H*0.44):int(H*0.56)]
     xs=np.where(row.any(axis=0))[0]
     x0=int(xs.min()) if len(xs) else 0
-    bw=int(W*0.86)-x0
-    bt=max(4,int(round(bar.shape[0]*bw/bar.shape[1])))
+    # end the bar inside the curl: right extent of the ㄷ's upper+lower arcs
+    band=np.concatenate([d[int(H*0.10):int(H*0.30)], d[int(H*0.70):int(H*0.90)]])
+    bx1=np.where(band.any(axis=0))[0]
+    x1=int(bx1.max()*0.96) if len(bx1) else int(W*0.80)
+    bw=max(8, x1-x0)
+    # thickness matches the ㄷ's own stroke
+    rw=d.sum(axis=1); dt=int(np.median(rw[rw>0])/2.2)
+    bt=max(4, min(dt, int(H*0.14)))
     y0=(H-bt)//2
     z=d.copy()
     z[y0:y0+bt, x0:x0+bw]|=_resize_mask(bar, bw, bt)
@@ -311,15 +317,13 @@ def hieut_respace(gid):
     barT,bx0=tight(bar); ringT,rx0=tight(ring)
     g1=max(6,int(H*0.20)); g2=max(5,int(H*0.14))
     if tick is not None and tick.any():
-        tickT,_=tight(tick)                    # keep the drawn tick's shape
-        if tickT.shape[1]<0.18*W:              # too small to read: widen, same aspect
-            tw=int(W*0.28)
-            tickT=_resize_mask(tickT, tw, max(4,int(round(tickT.shape[0]*tw/tickT.shape[1]))))
-        if tickT.shape[0]>0.13*H:              # too tall: shrink, same aspect
-            th2=max(5,int(H*0.13))
-            tickT=_resize_mask(tickT, max(5,int(round(tickT.shape[1]*th2/tickT.shape[0]))), th2)
+        tickT,_=tight(tick)                    # the drawn tick, at bar weight
+        th2=max(5, barT.shape[0])              # stroke = the bar's thickness
+        tw=max(int(W*0.24), int(round(tickT.shape[1]*th2/tickT.shape[0])))
+        tw=min(tw, int(W*0.42))
+        tickT=_resize_mask(tickT, tw, th2)
     else:
-        tickT=np.ones((max(4,int(H*0.10)),int(W*0.30)),bool)
+        tickT=np.ones((max(5,int(H*0.10)),int(W*0.30)),bool)
     Hn=tickT.shape[0]+g1+barT.shape[0]+g2+ringT.shape[0]
     Wn=max(barT.shape[1], ringT.shape[1], tickT.shape[1])
     z=np.zeros((Hn,Wn),bool)

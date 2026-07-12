@@ -109,6 +109,23 @@ def bounded_gap_axes(fg):
         out.append(float(np.percentile(g,25)) if len(g)>need else 1e9)
     return out[0], out[1]
 
+def _small_mask(fg, frac=0.10):
+    """Mask of small detached components (ticks) that erosion must spare."""
+    lab,n=ndimage.label(fg)
+    if n<2: return None
+    tot=fg.sum(); m=np.zeros_like(fg)
+    for c in range(1,n+1):
+        cc=(lab==c)
+        if cc.sum()<frac*tot: m|=cc
+    return m if m.any() else None
+
+def _erode_guarded(fg, st):
+    """Erode, but small components (ticks) keep their ink."""
+    sm=_small_mask(fg)
+    out=ndimage.binary_erosion(fg, structure=st)
+    if sm is not None: out|=(fg&sm)
+    return out
+
 def adjust_dir(fg0, th, kk=None):
     """Directional stroke equalisation: vertical and horizontal stroke
     widths are corrected independently (stretch-proof weight), then the
@@ -123,15 +140,15 @@ def adjust_dir(fg0, th, kk=None):
         mv=float(np.median(rx[vpx])); mh=float(np.median(ry[hpx]))
         if abs(mv-T)<1.5 and abs(mh-T)<1.5: break
         gx,gy=bounded_gap_axes(fg)
-        ex=int(round(np.clip((T-mv)/2.0, -20, min(20, k*gx/2.0))))
-        ey=int(round(np.clip((T-mh)/2.0, -20, min(20, k*gy/2.0))))
+        ex=int(round(np.clip((T-mv)/2.0, -6, min(6, k*gx/2.0))))
+        ey=int(round(np.clip((T-mh)/2.0, -6, min(6, k*gy/2.0))))
         if ex==0 and ey==0: break
         for e,horiz in ((ex,True),(ey,False)):
             if e==0: continue
             st=np.ones((1,2*abs(e)+1),bool) if horiz else np.ones((2*abs(e)+1,1),bool)
             if e>0: fg=ndimage.binary_dilation(fg, structure=st)
             else:
-                nxt=ndimage.binary_erosion(fg, structure=st)
+                nxt=_erode_guarded(fg, st)
                 if nxt.sum()>0.25*fg.sum(): fg=nxt
     return fg
 
@@ -152,6 +169,8 @@ def adjust_iso(fg0, th, kk=None, prepad=True):
         if c>=0:
             nxt=dt_in>c
             if nxt.sum()<0.2*fg0.sum(): c*=0.5; nxt=dt_in>c
+            sm=_small_mask(fg0)
+            if sm is not None: nxt=nxt|(fg0&sm)   # ticks never erode away
             cur=nxt
         else:
             cur=(dt_out<=-c)
@@ -192,7 +211,8 @@ for gid,m in meta.items():
             Wp=max(3,round(W*sx*Q)); Hp=max(3,round(H*sy*Q))
             im=Image.fromarray(np.where(fg,0,255).astype(np.uint8)).resize((Wp,Hp), Image.LANCZOS)
             fgs=np.asarray(im)<128
-            th_em=T_EM*GID_BOOST.get(gid,1.0)
+            sboost=min(1.04, max(0.82, (g/0.55)**0.30))   # smaller => lighter
+            th_em=max(0.72*T_EM, T_EM*GID_BOOST.get(gid,1.0)*sboost)
             kk=None
             if gid in STRUCT_CAP:
                 th_em=min(th_em, STRUCT_CAP[gid]*Hp); kk=0.30   # decks never fuse
