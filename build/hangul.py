@@ -24,9 +24,9 @@ def zones(jung, has_jong):
         if vt=='horz': return dict(cho=(.04,.02,.92,.54), jung=(.04,.56,.92,.42))
         return dict(cho=(.01,.01,.56,.61), jung=(.05,.03,.89,.95))   # mix
     else:
-        # batchim band sits close under the body; the vowel bar reaches a
-        # little past the initial but never stretches to the block bottom
-        if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.58), jong=(.06,.625,.88,.355))
+        # batchim band sits close under the body; the vowel bar reaches
+        # well past the initial but never stretches to the block bottom
+        if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.64), jong=(.06,.645,.88,.34))
         if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.43,.92,.18), jong=(.06,.635,.88,.32))
         return dict(cho=(.01,.01,.53,.49), jung=(.27,.02,.68,.57), jong=(.06,.585,.88,.375))  # mix
 
@@ -339,7 +339,7 @@ def _guard_jong(comps, jcomp, mingap=28):
         if jr>l and r>jl and b<jt2+mingap:
             need=max(need, jt2-(b-mingap))
     if need>0:
-        need=min(need, jb-(SQ_B-15))
+        need=min(need, jb-(SQ_B-35))   # finals may dip into descender space
         if need>0:
             jcomp=(jcomp[0],jcomp[1],jcomp[2],jcomp[3],jcomp[4]-need)
     return jcomp

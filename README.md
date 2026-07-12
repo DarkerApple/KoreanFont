@@ -6,9 +6,9 @@ tablet-drawn glyph worksheet (`build/raw/LightheadedRAW.pdf`).
 
 | Download | Coverage | Format |
 |---|---|---|
-| **[`Lightheaded-Regular.ttf`](Lightheaded-Regular.ttf)** | Korean + Latin + symbols | TrueType (recommended, ≈0.8 MB) |
-| **[`Lightheaded-Regular.otf`](Lightheaded-Regular.otf)** | Korean + Latin + symbols | OpenType/CFF (≈12 MB — CFF can't share composed syllables; prefer the TTF) |
-| **[`Lightheaded-Latin-Regular.ttf`](Lightheaded-Latin-Regular.ttf)** | Latin + symbols only | TrueType (≈0.04 MB) |
+| **[`Lightheaded-Regular.ttf`](Lightheaded-Regular.ttf)** | Korean + Latin + symbols | TrueType (recommended, ≈1.1 MB) |
+| **[`Lightheaded-Regular.otf`](Lightheaded-Regular.otf)** | Korean + Latin + symbols | OpenType/CFF (≈29 MB — CFF can't share composed syllables; prefer the TTF) |
+| **[`Lightheaded-Latin-Regular.ttf`](Lightheaded-Latin-Regular.ttf)** | Latin + symbols only | TrueType (≈0.02 MB) |
 | **[`Lightheaded-Latin-Regular.otf`](Lightheaded-Latin-Regular.otf)** | Latin + symbols only | OpenType/CFF |
 
 ![paragraph sample](samples/paragraph.png)
@@ -22,7 +22,7 @@ tablet-drawn glyph worksheet (`build/raw/LightheadedRAW.pdf`).
 | Latin | A–Z, a–z | consistent cap-height / x-height, even spacing |
 | Digits & symbols | 0–9 + full ASCII | `! @ # $ % ^ & * ( ) … ~` (`$ ^ \` |` synthesised to match) |
 | Typography | — | en/em dash, ellipsis, middle dot, curly quotes, ₩ won |
-| **Total glyphs** | **11,389** | UPM 1000, `fsType` 0 (embeddable) |
+| **Total glyphs** | **11,812** | UPM 1000, `fsType` 0 (embeddable) |
 
 Only **67 jamo + 88 ASCII glyphs were hand-drawn**; the 11,172 syllables are
 assembled from the jamo by an automatic composition engine (6 layout types,
@@ -35,7 +35,7 @@ you only need English/symbols, or want a tiny file.
 
 The font is tuned for an even, *lightheaded* look:
 
-- **Stroke weight** matched at ~72 em across Korean and Latin. Every jamo is
+- **Stroke weight** matched at ~80 em across Korean and Latin. Every jamo is
   calibrated per placement-scale bucket (weight variants selected at compose
   time) so all contexts render at the same optical weight.
 - **Letter sizes** pulled toward consistent cap-height / x-height per category

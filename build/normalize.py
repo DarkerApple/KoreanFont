@@ -11,6 +11,7 @@ T_EM=80.0        # target final rendered stroke width (em)
 # optical-color compensation: compressed multi-part jamo run slightly
 # lighter — mild, so strokes still read as one thickness family
 GID_BOOST={'cho01':0.93,'cho03':0.93,'cho08':0.92,'cho10':0.94,'cho13':0.93,
+           'cho18':0.90,
            'jong01':0.93,'jong19':0.94,'jong07':0.94,
            'jong15':0.94,'jong16':0.93,'jong24':0.93,'jong25':0.93,'jong26':0.95,
            **{f"jong{j:02d}":0.92 for j in (2,4,5,8,9,10,11,12,13,14,17)}}
@@ -120,8 +121,8 @@ def emit(out_name, fg, th):
 Q=1.0     # final-space raster: 1 px per em
 # multi-deck glyphs (detached tick / stacked bars): stroke is capped to a
 # fraction of the rendered height so the decks stay separable at small scales
-STRUCT_CAP={'cho14':0.18,'cho18':0.19,'cho12':0.22,'cho13':0.20,
-            'jong22':0.22,'jong23':0.18,'jong26':0.19,'jong04':0.20}
+STRUCT_CAP={'cho14':0.18,'cho18':0.16,'cho12':0.22,'cho13':0.20,
+            'jong22':0.22,'jong23':0.18,'jong26':0.17,'jong04':0.20}
 n=0
 for gid,m in meta.items():
     a=np.asarray(Image.open(f"glyphs/{gid}.png").convert('L')); fg=a<128
