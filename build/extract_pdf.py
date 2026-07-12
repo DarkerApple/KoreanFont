@@ -85,6 +85,154 @@ json.dump(meta,open("meta.json","w"),ensure_ascii=False)
 print(f"cells assigned={len(assign)} with-ink={nink} empty={sum(1 for r in meta.values() if r['empty'])}")
 print("empty:",[k for k,r in meta.items() if r['empty']])
 
+# ---- post-clean the drawn jamo --------------------------------------------
+def _load_g(gid):
+    a=np.asarray(Image.open(f"glyphs/{gid}.png").convert('L')); return a<128
+def _save_g(gid, ink):
+    ys,xs=np.where(ink)
+    g=np.where(ink[ys.min():ys.max()+1, xs.min():xs.max()+1],0,255).astype(np.uint8)
+    Image.fromarray(g).save(f"glyphs/{gid}.png")
+
+def trim_stem(gid, side):
+    """Drop narrow stem overshoot past the arm of ㅗ/ㅜ/ㅛ/ㅠ.
+    side='u': arm on top (ㅜㅠ) — clear ink above it; side='o': arm at bottom."""
+    import os as _os
+    if not _os.path.exists(f"glyphs/{gid}.png"): return
+    ink=_load_g(gid); H,W=ink.shape
+    rw=ink.sum(axis=1)
+    wide=np.where(rw>=0.55*W)[0]
+    if len(wide)==0: return
+    if side=='u':
+        t0=wide.min()
+        if t0>0 and ink[:t0].any(): ink[:t0]=False; _save_g(gid,ink)
+    else:
+        b0=wide.max()
+        if b0<H-1 and ink[b0+1:].any(): ink[b0+1:]=False; _save_g(gid,ink)
+
+def _resize_mask(ink, w, h):
+    im=Image.fromarray(np.where(ink,0,255).astype(np.uint8)).resize((max(1,w),max(1,h)),Image.LANCZOS)
+    return np.asarray(im)<128
+
+def print_jieut():
+    """Rebuild ㅈ with print topology from the user's own ink:
+    their ㅡ as the top bar + their ㅅ beneath, apex meeting the bar."""
+    s=_load_g('cho09'); bar=_load_g('jung18')
+    sh,sw=s.shape; bh,bw=bar.shape
+    W=int(round(sw*1.10))
+    b=_resize_mask(bar, W, max(4,int(round(bh*W/bw))))
+    bh2=b.shape[0]
+    ov=max(2,int(bh2*0.45))
+    H=bh2-ov+sh
+    z=np.zeros((H,W),bool)
+    z[:bh2,:]=b
+    x0=(W-sw)//2
+    z[bh2-ov:bh2-ov+sh, x0:x0+sw]|=s
+    return z
+
+def _tick():
+    """The detached tick from the drawn ㅊ (topmost small component)."""
+    from scipy import ndimage as _n
+    ink=_load_g('cho14')
+    lab,n=_n.label(ink)
+    if n<2: return None
+    parts=[]
+    for c in range(1,n+1):
+        ys,xs=np.where(lab==c)
+        parts.append((ys.min(),c,ys,xs))
+    parts.sort()
+    y0,c,ys,xs=parts[0]
+    if (lab==c).sum()>0.30*ink.sum(): return None
+    return ink[ys.min():ys.max()+1, xs.min():xs.max()+1]
+
+def print_chieut(z):
+    t=_tick()
+    if t is None:
+        th=max(4,z.shape[0]//12); tw=z.shape[1]//3
+        t=np.ones((th,tw),bool)
+    gap=max(3,z.shape[0]//14)
+    H=t.shape[0]+gap+z.shape[0]; W=max(z.shape[1],t.shape[1])
+    out=np.zeros((H,W),bool)
+    tx=(W-t.shape[1])//2
+    out[:t.shape[0], tx:tx+t.shape[1]]=t
+    out[t.shape[0]+gap:, (W-z.shape[1])//2:(W-z.shape[1])//2+z.shape[1]]=z
+    return out
+
+def _swap_right(gid, z):
+    """Replace the right half of a two-part cluster (e.g. ㄵ) with new ink."""
+    ink=_load_g(gid); H,W=ink.shape
+    cols=ink.any(axis=0); runs=[]; x=0
+    while x<W:
+        if cols[x]:
+            j=x
+            while j<W and cols[j]: j+=1
+            runs.append((x,j)); x=j
+        else: x+=1
+    if len(runs)<2: return
+    inkw=sum(b-a for a,b in runs); best=None
+    for k in range(len(runs)-1):
+        gap=runs[k+1][0]-runs[k][1]
+        if gap<0.03*W: continue
+        left=sum(b-a for a,b in runs[:k+1])/inkw
+        bal=min(left,1-left)
+        if best is None or bal>best[0]: best=(bal,k)
+    if not best: return
+    k=best[1]
+    left=ink[:, :runs[k][1]]
+    rh=H
+    rz=_resize_mask(z, int(round(z.shape[1]*rh/z.shape[0])), rh)
+    gap=runs[k+1][0]-runs[k][1]
+    out=np.zeros((H, runs[k][1]+gap+rz.shape[1]), bool)
+    out[:, :runs[k][1]]=left
+    out[:, runs[k][1]+gap:]=rz
+    _save_g(gid, out)
+
+def equalize_bars(gid):
+    """ㅐㅒㅔㅖ (and split compound bars): make both vertical stems the
+    same height by extending the shorter ends."""
+    import os as _os
+    if not _os.path.exists(f"glyphs/{gid}.png"): return
+    ink=_load_g(gid); H,W=ink.shape
+    ysi=np.arange(H)[:,None]
+    cols=ink.any(axis=0)
+    top=np.where(ink, ysi, H).min(axis=0); bot=np.where(ink, ysi, -1).max(axis=0)
+    colh=np.where(cols, bot-top+1, 0)
+    tallc=colh>=0.60*H
+    runs=[]; x=0
+    while x<W:
+        if tallc[x]:
+            j=x
+            while j<W and tallc[j]: j+=1
+            runs.append((x,j)); x=j
+        else: x+=1
+    if len(runs)<2: return
+    runs=runs[-2:]                          # the two stems (rightmost tall runs)
+    spans=[(min(top[a:b]), max(bot[a:b])) for a,b in runs]
+    T=min(s[0] for s in spans); B=max(s[1] for s in spans)
+    for (a,b),(t,bt) in zip(runs,spans):
+        if t>T:  # extend upward, replicating a clean row of this stem
+            row=ink[min(t+3,H-1), a:b]
+            for y in range(T,t): ink[y, a:b]|=row
+        if bt<B:
+            row=ink[max(bt-3,0), a:b]
+            for y in range(bt+1,B+1): ink[y, a:b]|=row
+    _save_g(gid, ink)
+
+# plain ㅗㅜㅛㅠ: stems must not cross their arm
+trim_stem('jung13','u'); trim_stem('jung17','u')
+trim_stem('jung08','o'); trim_stem('jung12','o')
+# print-topology ㅈ / ㅊ / ㅉ built from the user's own ㅡ + ㅅ (+ drawn tick)
+_Z=print_jieut(); _C=print_chieut(_Z)
+_save_g('cho12',_Z); _save_g('cho14',_C)
+_zz_w=int(round(_Z.shape[1]*0.58))
+_zz=np.zeros((_Z.shape[0], 2*_zz_w+max(3,_Z.shape[1]//12)), bool)
+_zzp=_resize_mask(_Z,_zz_w,_Z.shape[0])
+_zz[:, :_zz_w]|=_zzp; _zz[:, _zz.shape[1]-_zz_w:]|=_zzp
+_save_g('cho13',_zz)
+_save_g('jong22',_Z); _save_g('jong23',_C)
+_swap_right('jong04', _Z)                   # ㄵ = ㄴ + new ㅈ
+equalize_bars('jung01'); equalize_bars('jung03')
+equalize_bars('jung05'); equalize_bars('jung07')
+
 # ---- decompose mix vowels (ㅘㅙㅚㅝㅞㅟㅢ) into base (ㅗ/ㅜ/ㅡ) + right bar ----
 # split at the most balanced wide column gap; each part becomes its own glyph
 # so composition can place them independently (base under the initial, bar right).
@@ -162,3 +310,7 @@ if __name__=='__main__' or True:
                                                   char=src["char"],empty=False,
                                                   box_rel=src["box_rel"],ink_px=src["ink_px"])
     _j.dump(meta2, open("meta.json","w"), ensure_ascii=False)
+    # split bases inherit the arm rule; split double bars get equal stems
+    for i in (9,10,11): trim_stem(f"jung{i:02d}_base",'o')
+    for i in (14,15,16): trim_stem(f"jung{i:02d}_base",'u')
+    equalize_bars('jung10_bar'); equalize_bars('jung15_bar')

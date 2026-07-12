@@ -297,17 +297,17 @@ def compose_components(cho_i, jung_i, jong_full):
         nx=min(max(lo, BAR_MIN), SQ_R-jw)
         comps.append((name,bx,by,nx,dy))
         if has:
-            comps.append(component("jong%02d"%(jong_full-1),
-                         jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong',vt)))
+            comps.append(_guard_jong(comps, component("jong%02d"%(jong_full-1),
+                         jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong',vt))))
     else:   # horz: vowel anchored, the initial fills everything above it (rule 2)
         jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
         _,_,jb,jt=comp_span(jc)
         top=SQ_T-.02*SQH
-        cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt+52, SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
+        cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt+(70 if has else 95), SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
         comps=[cho,jc]
         if has:
-            comps.append(component("jong%02d"%(jong_full-1),
-                         jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong',vt)))
+            comps.append(_guard_jong(comps, component("jong%02d"%(jong_full-1),
+                         jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong',vt)), mingap=22))
     # ---- uniform block: normalise ink width, then centre in the advance ----
     mn,mx,_,_=_spans(comps)
     w=mx-mn; W_T=0.90*SQW
@@ -316,7 +316,27 @@ def compose_components(cho_i, jung_i, jong_full):
         comps=[(n,bx*f,by,mn+(dx-mn)*f,dy) for (n,bx,by,dx,dy) in comps]
         mn,mx,_,_=_spans(comps)
     shift=(ADV-(mx-mn))/2.0 - mn
-    return [(n,bx,by,dx+shift,dy) for (n,bx,by,dx,dy) in comps]
+    comps=[(n,bx,by,dx+shift,dy) for (n,bx,by,dx,dy) in comps]
+    # ---- optical vertical centring: all blocks share one axis (no row wobble)
+    _,_,bm,tm=_spans(comps)
+    MID=(SQ_T+SQ_B)/2.0
+    vs=max(-90.0, min(90.0, MID-(tm+bm)/2.0))
+    vs=min(vs, SQ_T+8-tm)                    # never poke above the square
+    return [(n,bx,by,dx,dy+vs) for (n,bx,by,dx,dy) in comps]
+
+def _guard_jong(comps, jcomp, mingap=28):
+    """Shift a final down (within the square) if it crowds the body above."""
+    jl,jr,jb,jt2=comp_span(jcomp)
+    need=0.0
+    for c in comps:
+        l,r,b,t=comp_span(c)
+        if jr>l and r>jl and b<jt2+mingap:
+            need=max(need, jt2-(b-mingap))
+    if need>0:
+        need=min(need, jb-(SQ_B-15))
+        if need>0:
+            jcomp=(jcomp[0],jcomp[1],jcomp[2],jcomp[3],jcomp[4]-need)
+    return jcomp
 
 def _spans(comps):
     ls,rs,bs,ts=[],[],[],[]
@@ -337,17 +357,18 @@ def _compose_mix(cho_i, jung_i, jong_full, has):
                          jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong','mix')))
         return comps
     # vertical budget (fractions of SQH, from the top)
-    if has: cho_h, base_h, jong_y = .37, .16, .615
-    else:   cho_h, base_h, jong_y = .44, .21, None
+    if has: cho_h, base_h, jong_y, gap = .34, .17, .615, 60
+    else:   cho_h, base_h, jong_y, gap = .42, .26, None, 85
     top=SQ_T-.02*SQH
     # initial: top-left, free fill
     cho=fit_box("cho%02d"%cho_i, SQ_L+.02*SQW, top-cho_h*SQH, SQ_L+.56*SQW, top, ax=0.35, ay=0.4)
     comps=[cho]
     cl,cr,cb,ct=comp_span(cho)
-    # base: width follows the initial (stem tucked inside its footprint)
+    # base: width follows the initial (stem tucked inside its footprint),
+    # with commercial-scale air under the cho and a longer stem
     bw=(cr-cl)*1.12
     bx0=max(SQ_L+.01*SQW, cl-(bw-(cr-cl))/2.0)
-    btop=cb-40                                           # small gap under the cho
+    btop=cb-gap
     base=fit_box(gb, bx0, btop-base_h*SQH, bx0+bw, btop)
     comps.append(base)
     # bar: right, 2-D coupled with floor, spanning the body height
@@ -365,16 +386,8 @@ def _compose_mix(cho_i, jung_i, jong_full, has):
     comps.append((base_name(vg), bxs, by, nx, bar_bot))
     if has:
         z=zones(jung_i, True)
-        jcomp=component("jong%02d"%(jong_full-1),
-                        jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong','mix'))
-        # clearance guard: keep the final below the vowel base
-        jl,jr,jb,jt2=comp_span(jcomp)
-        _,_,bb_,_=comp_span(base); bl_,br_,_,_=comp_span(base)
-        if jr>bl_ and br_>jl and jt2>bb_-28:
-            shift=min(jt2-(bb_-28), jb-SQ_B)
-            if shift>0:
-                jcomp=(jcomp[0],jcomp[1],jcomp[2],jcomp[3],jcomp[4]-shift)
-        comps.append(jcomp)
+        comps.append(_guard_jong([cho,base], component("jong%02d"%(jong_full-1),
+                     jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong','mix'))))
     return comps
 
 # standalone jamo (for compatibility-jamo codepoints): centred in the square
