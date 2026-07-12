@@ -309,12 +309,17 @@ def hieut_respace(gid):
         ys,xs=np.where(a)
         return a[ys.min():ys.max()+1, xs.min():xs.max()+1], xs.min()
     barT,bx0=tight(bar); ringT,rx0=tight(ring)
-    g1=max(5,int(H*0.15)); g2=max(4,int(H*0.11))
-    th=max(4,int(H*0.10)); tw=int(W*0.30)
-    tickT=_resize_mask(tick, tw, th)[0:th] if tick is not None and tick.any() else np.ones((th,tw),bool)
+    g1=max(6,int(H*0.20)); g2=max(5,int(H*0.14))
     if tick is not None and tick.any():
-        tickT,_=tight(tick)
-        tickT=_resize_mask(tickT, tw, max(th,int(round(tickT.shape[0]*tw/tickT.shape[1]*0.5))))
+        tickT,_=tight(tick)                    # keep the drawn tick's shape
+        if tickT.shape[1]<0.18*W:              # too small to read: widen, same aspect
+            tw=int(W*0.28)
+            tickT=_resize_mask(tickT, tw, max(4,int(round(tickT.shape[0]*tw/tickT.shape[1]))))
+        if tickT.shape[0]>0.13*H:              # too tall: shrink, same aspect
+            th2=max(5,int(H*0.13))
+            tickT=_resize_mask(tickT, max(5,int(round(tickT.shape[1]*th2/tickT.shape[0]))), th2)
+    else:
+        tickT=np.ones((max(4,int(H*0.10)),int(W*0.30)),bool)
     Hn=tickT.shape[0]+g1+barT.shape[0]+g2+ringT.shape[0]
     Wn=max(barT.shape[1], ringT.shape[1], tickT.shape[1])
     z=np.zeros((Hn,Wn),bool)

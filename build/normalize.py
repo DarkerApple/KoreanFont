@@ -74,9 +74,12 @@ def stroke_w(fg):
     return 4*float(np.median(dt[fg]))
 
 def bounded_gap(fg):
-    """Smallest typical internal background gap (px) — fusion guard."""
+    """Smallest typical internal background gap (px) — fusion guard.
+    Tiny concave pockets at stroke joints are ignored: only gap
+    populations big enough to be real counters/deck spacing count."""
     bg=~fg
     vals=[]
+    need=max(60, int(0.025*fg.sum()))
     for axis in (0,1):
         f=fg if axis==0 else fg.T
         cum_d=np.maximum.accumulate(f,axis=0)            # ink somewhere above
@@ -86,13 +89,14 @@ def bounded_gap(fg):
         rl=runlen(bg,axis)
         g=rl[bounded]
         g=g[g>0]
-        if len(g)>50: vals.append(float(np.percentile(g,25)))
+        if len(g)>need: vals.append(float(np.percentile(g,25)))
     return min(vals) if vals else 1e9
 
-def adjust_iso(fg0, th):
+def adjust_iso(fg0, th, kk=None):
     """Erode/dilate isotropically to stroke half-width th (px), guarding fusion."""
     fg0=np.pad(fg0,PAD)
-    cap=max(9.0, 0.45*bounded_gap(fg0))
+    k=kk if kk else min(0.68, max(0.38, 0.45*(T_EM/80.0)**1.3))  # bold closes counters more
+    cap=max(9.0, k*bounded_gap(fg0))
     dt_in=ndimage.distance_transform_edt(fg0)
     dt_out=ndimage.distance_transform_edt(~fg0)
     c=0.0; cur=fg0
@@ -110,8 +114,8 @@ def adjust_iso(fg0, th):
             cur=(dt_out<=-c)
     return cur
 
-def emit(out_name, fg, th):
-    out=adjust_iso(fg, th)
+def emit(out_name, fg, th, kk=None):
+    out=adjust_iso(fg, th, kk)
     if not out.any():
         out=np.pad(fg,PAD)                     # never dissolve: keep the source
     ys,xs=np.where(out)
@@ -120,9 +124,13 @@ def emit(out_name, fg, th):
 
 Q=1.0     # final-space raster: 1 px per em
 # multi-deck glyphs (detached tick / stacked bars): stroke is capped to a
-# fraction of the rendered height so the decks stay separable at small scales
-STRUCT_CAP={'cho14':0.18,'cho18':0.16,'cho12':0.22,'cho13':0.20,
-            'jong22':0.22,'jong23':0.18,'jong26':0.17,'jong04':0.20}
+# fraction of the rendered height so the decks stay separable at small
+# scales; the fraction breathes with the weight so Bold stays bold
+_WS=(T_EM/80.0)**0.7
+STRUCT_CAP={g:f*_WS for g,f in
+            {'cho14':0.18,'cho18':0.16,'cho12':0.22,'cho13':0.20,
+             'cho16':0.20,'jong24':0.20,
+             'jong22':0.22,'jong23':0.18,'jong26':0.17,'jong04':0.20}.items()}
 n=0
 for gid,m in meta.items():
     a=np.asarray(Image.open(f"glyphs/{gid}.png").convert('L')); fg=a<128
@@ -138,6 +146,8 @@ for gid,m in meta.items():
             im=Image.fromarray(np.where(fg,0,255).astype(np.uint8)).resize((Wp,Hp), Image.LANCZOS)
             fgs=np.asarray(im)<128
             th_em=T_EM*GID_BOOST.get(gid,1.0)
-            if gid in STRUCT_CAP: th_em=min(th_em, STRUCT_CAP[gid]*Hp)
-            emit(f"{gid}_{k}", fgs, (th_em*Q)/2.0); n+=1
+            kk=None
+            if gid in STRUCT_CAP:
+                th_em=min(th_em, STRUCT_CAP[gid]*Hp); kk=0.30   # decks never fuse
+            emit(f"{gid}_{k}", fgs, (th_em*Q)/2.0, kk); n+=1
 print(f"normalized -> {n} bitmaps (final-space pre-stretch, isotropic weight)")

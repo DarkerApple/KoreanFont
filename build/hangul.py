@@ -374,8 +374,8 @@ def _compose_mix(cho_i, jung_i, jong_full, has):
                          jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong','mix')))
         return comps
     # vertical budget (fractions of SQH, from the top)
-    if has: cho_h, base_h, jong_y, gap = .34, .17, .615, 45
-    else:   cho_h, base_h, jong_y, gap = .42, .26, None, 55
+    if has: cho_h, base_h, jong_y, gap = .36, .17, .615, 45
+    else:   cho_h, base_h, jong_y, gap = .46, .25, None, 55
     top=SQ_T-.02*SQH
     # initial: top-left, free fill
     cho=fit_box("cho%02d"%cho_i, SQ_L+.02*SQW, top-cho_h*SQH, SQ_L+.56*SQW, top, ax=0.35, ay=0.4)
