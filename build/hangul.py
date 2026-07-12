@@ -309,7 +309,7 @@ def compose_components(cho_i, jung_i, jong_full):
         jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], ja)  # block fills the square
         _,_,jb,jt=comp_span(jc)
         top=SQ_T-.02*SQH
-        cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt+(55 if has else 60), SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
+        cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt+(40 if has else 45), SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
         comps=[cho,jc]
         if has:
             comps.append(_guard_jong(comps, component("jong%02d"%(jong_full-1),
@@ -363,8 +363,8 @@ def _compose_mix(cho_i, jung_i, jong_full, has):
                          jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong','mix')))
         return comps
     # vertical budget (fractions of SQH, from the top)
-    if has: cho_h, base_h, jong_y, gap = .34, .17, .615, 55
-    else:   cho_h, base_h, jong_y, gap = .42, .26, None, 70
+    if has: cho_h, base_h, jong_y, gap = .34, .17, .615, 45
+    else:   cho_h, base_h, jong_y, gap = .42, .26, None, 55
     top=SQ_T-.02*SQH
     # initial: top-left, free fill
     cho=fit_box("cho%02d"%cho_i, SQ_L+.02*SQW, top-cho_h*SQH, SQ_L+.56*SQW, top, ax=0.35, ay=0.4)

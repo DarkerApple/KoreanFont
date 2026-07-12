@@ -16,7 +16,7 @@ GID_BOOST={'cho01':0.93,'cho03':0.93,'cho08':0.92,'cho10':0.94,'cho13':0.93,
            'jong15':0.94,'jong16':0.93,'jong24':0.93,'jong25':0.93,'jong26':0.95,
            **{f"jong{j:02d}":0.92 for j in (2,4,5,8,9,10,11,12,13,14,17)}}
 MAX_DILATE=9.0
-PAD=12
+PAD=40           # must exceed the worst dilation, or thin bars clip flat
 SPAN=1.10        # scale bucket max span
 RSPAN=1.07       # ratio bucket max span
 MAXK=40

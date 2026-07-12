@@ -243,6 +243,95 @@ trim_stem('jung08','o'); trim_stem('jung12','o')
 # ㅌ = the drawn ㄷ + a clean middle bar (same stroke set, same curl)
 _save_g('cho16', tieut_from_dieut('cho03'))
 _save_g('jong24', tieut_from_dieut('jong06'))
+
+def formal_rieul(gk, nn):
+    """Formal print ㄹ from the user's own strokes: their ㄱ on top, their
+    ㄴ below, joined by a full-width middle bar (their ㅡ)."""
+    g=_load_g(gk); n=_load_g(nn); bar=_load_g('jung18')
+    W=max(g.shape[1], n.shape[1])
+    K=int(W*0.55)
+    bt=max(4,int(round(bar.shape[0]*W/bar.shape[1])))
+    H=2*K-bt
+    z=np.zeros((H,W),bool)
+    z[:K,:]|=_resize_mask(g, W, K)
+    z[H-K:,:]|=_resize_mask(n, W, K)
+    z[K-bt:K,:]|=_resize_mask(bar, W, bt)
+    return z
+
+def _swap_left(gid, z):
+    """Replace the left element of a two-part cluster (ㄺㄻㄼ…) with new ink."""
+    ink=_load_g(gid); H,W=ink.shape
+    cols=ink.any(axis=0); runs=[]; x=0
+    while x<W:
+        if cols[x]:
+            j=x
+            while j<W and cols[j]: j+=1
+            runs.append((x,j)); x=j
+        else: x+=1
+    if len(runs)<2: return
+    inkw=sum(b-a for a,b in runs); best=None
+    for k in range(len(runs)-1):
+        gap=runs[k+1][0]-runs[k][1]
+        if gap<0.03*W: continue
+        left=sum(b-a for a,b in runs[:k+1])/inkw
+        bal=min(left,1-left)
+        if best is None or bal>best[0]: best=(bal,k)
+    if not best: return
+    k=best[1]
+    right=ink[:, runs[k+1][0]:]
+    lz=_resize_mask(z, int(round(z.shape[1]*H/z.shape[0])), H)
+    gap=runs[k+1][0]-runs[k][1]
+    out=np.zeros((H, lz.shape[1]+gap+right.shape[1]), bool)
+    out[:, :lz.shape[1]]=lz
+    out[:, lz.shape[1]+gap:]=right
+    _save_g(gid, out)
+
+# formal ㄹ everywhere: cho, jong, and inside the ㄹ-clusters
+_save_g('cho05', formal_rieul('cho00','cho02'))
+_R=formal_rieul('jong00','jong03')
+_save_g('jong07', _R)
+for _g in ('jong08','jong09','jong10','jong11','jong12','jong13','jong14'):
+    _swap_left(_g, _R)
+
+def hieut_respace(gid):
+    """Re-space ㅎ's decks (tick / bar / ring) with clear gaps so they stay
+    separable when the glyph is compressed (호효혼)."""
+    from scipy import ndimage as _n
+    ink=_load_g(gid); H,W=ink.shape
+    lab,n=_n.label(ink)
+    if n<2: return
+    tops=[(np.where(lab==c)[0].min(),c) for c in range(1,n+1)]
+    tops.sort()
+    top_c=tops[0][1]; ring=np.zeros_like(ink)
+    for _,c in tops[1:]: ring|=(lab==c)
+    comp1=(lab==top_c)
+    rw=comp1.sum(axis=1)
+    wide=np.where(rw>=0.55*rw.max())[0]
+    t0=wide.min()
+    tick=comp1[:t0] if t0>2 and comp1[:t0].any() else None
+    bar=comp1[t0:]
+    def tight(a):
+        ys,xs=np.where(a)
+        return a[ys.min():ys.max()+1, xs.min():xs.max()+1], xs.min()
+    barT,bx0=tight(bar); ringT,rx0=tight(ring)
+    g1=max(5,int(H*0.15)); g2=max(4,int(H*0.11))
+    th=max(4,int(H*0.10)); tw=int(W*0.30)
+    tickT=_resize_mask(tick, tw, th)[0:th] if tick is not None and tick.any() else np.ones((th,tw),bool)
+    if tick is not None and tick.any():
+        tickT,_=tight(tick)
+        tickT=_resize_mask(tickT, tw, max(th,int(round(tickT.shape[0]*tw/tickT.shape[1]*0.5))))
+    Hn=tickT.shape[0]+g1+barT.shape[0]+g2+ringT.shape[0]
+    Wn=max(barT.shape[1], ringT.shape[1], tickT.shape[1])
+    z=np.zeros((Hn,Wn),bool)
+    tx=(Wn-tickT.shape[1])//2
+    z[:tickT.shape[0], tx:tx+tickT.shape[1]]=tickT
+    y=tickT.shape[0]+g1
+    z[y:y+barT.shape[0], (Wn-barT.shape[1])//2:(Wn-barT.shape[1])//2+barT.shape[1]]|=barT
+    y+=barT.shape[0]+g2
+    z[y:y+ringT.shape[0], (Wn-ringT.shape[1])//2:(Wn-ringT.shape[1])//2+ringT.shape[1]]|=ringT
+    _save_g(gid, z)
+
+hieut_respace('cho18'); hieut_respace('jong26')
 # print-topology ㅈ / ㅊ / ㅉ built from the user's own ㅡ + ㅅ (+ drawn tick)
 _Z=print_jieut(); _C=print_chieut(_Z)
 _save_g('cho12',_Z); _save_g('cho14',_C)
