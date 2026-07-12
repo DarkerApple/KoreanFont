@@ -24,9 +24,9 @@ def zones(jung, has_jong):
         if vt=='horz': return dict(cho=(.04,.02,.92,.54), jung=(.04,.56,.92,.42))
         return dict(cho=(.01,.01,.56,.61), jung=(.05,.03,.89,.95))   # mix
     else:
-        # batchim band sits close under the body; a vertical vowel bar runs
-        # the full block height (commercial layout), the final tucks left of it
-        if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.96), jong=(.06,.615,.88,.36))
+        # batchim band sits close under the body; the vowel bar reaches a
+        # little past the initial but never stretches to the block bottom
+        if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.58), jong=(.06,.625,.88,.355))
         if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.43,.92,.18), jong=(.06,.635,.88,.32))
         return dict(cho=(.01,.01,.53,.49), jung=(.27,.02,.68,.57), jong=(.06,.585,.88,.375))  # mix
 
@@ -302,18 +302,13 @@ def compose_components(cho_i, jung_i, jong_full):
         nx=min(max(lo, BAR_MIN), SQ_R-jw)
         comps.append((name,bx,by,nx,dy))
         if has:
-            # the final tucks under the initial, stopping clear of the bar
-            j0=jong_full-1
-            jr=(nx-55-SQ_L)/SQW
-            jl=.03 if j0 in COMPOUND_JONG else .10
-            jz=(jl, z['jong'][1], max(.30, min(.97,jr)-jl), z['jong'][3])
-            comps.append(_guard_jong(comps, component("jong%02d"%j0, jz,
-                         ROLE_FIT['jong'], align_for('jong',vt))))
+            comps.append(_guard_jong(comps, component("jong%02d"%(jong_full-1),
+                         jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong',vt))))
     else:   # horz: vowel anchored, the initial fills everything above it (rule 2)
         jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
         _,_,jb,jt=comp_span(jc)
         top=SQ_T-.02*SQH
-        cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt+(70 if has else 95), SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
+        cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt+(55 if has else 60), SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
         comps=[cho,jc]
         if has:
             comps.append(_guard_jong(comps, component("jong%02d"%(jong_full-1),
@@ -367,8 +362,8 @@ def _compose_mix(cho_i, jung_i, jong_full, has):
                          jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong','mix')))
         return comps
     # vertical budget (fractions of SQH, from the top)
-    if has: cho_h, base_h, jong_y, gap = .34, .17, .615, 60
-    else:   cho_h, base_h, jong_y, gap = .42, .26, None, 85
+    if has: cho_h, base_h, jong_y, gap = .34, .17, .615, 55
+    else:   cho_h, base_h, jong_y, gap = .42, .26, None, 70
     top=SQ_T-.02*SQH
     # initial: top-left, free fill
     cho=fit_box("cho%02d"%cho_i, SQ_L+.02*SQW, top-cho_h*SQH, SQ_L+.56*SQW, top, ax=0.35, ay=0.4)
