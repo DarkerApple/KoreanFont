@@ -71,7 +71,7 @@ def raw_dims(gid):
     t=traces.get('raw_'+gid) or T(gid)
     return t[0], t[1]
 
-def fit_box(gid, x0, y0, x1, y1, uniform=False, ax=0.5, ay=0.5):
+def fit_box(gid, x0, y0, x1, y1, uniform=False, ax=0.5, ay=0.5, acap=None):
     """Place gid into the em box; free anisotropic fill unless uniform.
     Returns a component tuple (name, bx, by, dx, dy)."""
     W,H=raw_dims(gid)
@@ -81,7 +81,7 @@ def fit_box(gid, x0, y0, x1, y1, uniform=False, ax=0.5, ay=0.5):
         s=min(bw/wu, bh/1000.0); bx=by=s
     else:
         bx=bw/wu; by=bh/1000.0
-        cap=1.85 if gid.startswith('cho11') else AFREE   # rings stay ring-like
+        cap=acap or (1.85 if gid.startswith('cho11') else AFREE)  # rings stay ring-like
         if bx/by>cap: bx=by*cap
         if by/bx>cap: by=bx*cap
     vg=select_by(gid,bx,by)
@@ -104,8 +104,8 @@ def optical_fill(gid, fill):
     if gid.startswith('jung'): return fill
     n=len(T(gid)[2])               # traced contour count = stroke complexity
     if gid.startswith('jong'):     # batchim stays big even when simple
-        return fill*(0.97 if n<=1 else 1.0)
-    return fill*(0.90 if n<=1 else 0.96 if n==2 else 1.0)
+        return fill*(0.98 if n<=1 else 1.0)
+    return fill*(0.93 if n<=1 else 0.97 if n==2 else 1.0)
 
 # per-role stretch policy: (h_min,h_max) as zone fraction, max vertical
 # anisotropy A, max width overstretch WCAP (x uniform fit)
@@ -388,6 +388,13 @@ def _compose_mix(cho_i, jung_i, jong_full, has):
     BAR_MIN=min(_spans(comps)[0]+(0.90*SQW)/1.08-jw, SQ_L+0.62*SQW)
     nx=min(max(lo, BAR_MIN), SQ_R-jw)
     comps.append((base_name(vg), bxs, by, nx, bar_bot))
+    # the base arm runs the full width beneath the initial and terminates
+    # a fixed gap before the bar — never a stub that stops mid-block
+    bl_,br_,bb_,bt_=comp_span(base)
+    x1new=nx-75
+    if x1new>br_+8:
+        base=fit_box(gb, min(cl,bl_), bb_, x1new, bt_, acap=4.0)
+        comps[1]=base
     if has:
         z=zones(jung_i, True)
         comps.append(_guard_jong([cho,base], component("jong%02d"%(jong_full-1),

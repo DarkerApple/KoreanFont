@@ -217,9 +217,28 @@ def equalize_bars(gid):
             for y in range(bt+1,B+1): ink[y, a:b]|=row
     _save_g(gid, ink)
 
+def print_tieut():
+    """Rebuild ㅌ from the user's own strokes: straight ㅣ stem + three ㅡ
+    bars with exactly equal gaps (the drawn ㅌ curls into a Є shape)."""
+    W,H=_load_g('cho16').shape[::-1]            # keep the drawn ㅌ's box
+    bar=_load_g('jung18'); stem=_load_g('jung20')
+    bt=max(4,int(round(bar.shape[0]*W/bar.shape[1])))
+    sw=max(4,int(round(stem.shape[1]*H/stem.shape[0])))
+    s=_resize_mask(stem, sw, H)
+    z=np.zeros((H,W),bool)
+    z[:, :sw]|=s
+    x0=sw//2
+    for y,frac in ((0,1.0), ((H-bt)//2,0.86), (H-bt,1.0)):
+        bw=int((W-x0)*frac)
+        z[y:y+bt, x0:x0+bw]|=_resize_mask(bar, bw, bt)
+    return z
+
 # plain ㅗㅜㅛㅠ: stems must not cross their arm
 trim_stem('jung13','u'); trim_stem('jung17','u')
 trim_stem('jung08','o'); trim_stem('jung12','o')
+# print-form ㅌ (straight stem, equal bar gaps) for cho + jong
+_T=print_tieut()
+_save_g('cho16',_T); _save_g('jong24',_T)
 # print-topology ㅈ / ㅊ / ㅉ built from the user's own ㅡ + ㅅ (+ drawn tick)
 _Z=print_jieut(); _C=print_chieut(_Z)
 _save_g('cho12',_Z); _save_g('cho14',_C)
