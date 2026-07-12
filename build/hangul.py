@@ -24,8 +24,9 @@ def zones(jung, has_jong):
         if vt=='horz': return dict(cho=(.04,.02,.92,.54), jung=(.04,.56,.92,.42))
         return dict(cho=(.01,.01,.56,.61), jung=(.05,.03,.89,.95))   # mix
     else:
-        # batchim band sits close under the body
-        if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.54), jong=(.06,.56,.88,.385))
+        # batchim band sits close under the body; a vertical vowel bar runs
+        # the full block height (commercial layout), the final tucks left of it
+        if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.96), jong=(.06,.615,.88,.36))
         if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.43,.92,.18), jong=(.06,.635,.88,.32))
         return dict(cho=(.01,.01,.53,.49), jung=(.27,.02,.68,.57), jong=(.06,.585,.88,.375))  # mix
 
@@ -104,8 +105,8 @@ def optical_fill(gid, fill):
     if gid.startswith('jung'): return fill
     n=len(T(gid)[2])               # traced contour count = stroke complexity
     if gid.startswith('jong'):     # batchim stays big even when simple
-        return fill*(0.98 if n<=1 else 1.0)
-    return fill*(0.93 if n<=1 else 0.97 if n==2 else 1.0)
+        return fill*(0.99 if n<=1 else 1.0)
+    return fill*(0.96 if n<=1 else 0.98 if n==2 else 1.0)
 
 # per-role stretch policy: (h_min,h_max) as zone fraction, max vertical
 # anisotropy A, max width overstretch WCAP (x uniform fit)
@@ -301,8 +302,13 @@ def compose_components(cho_i, jung_i, jong_full):
         nx=min(max(lo, BAR_MIN), SQ_R-jw)
         comps.append((name,bx,by,nx,dy))
         if has:
-            comps.append(_guard_jong(comps, component("jong%02d"%(jong_full-1),
-                         jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong',vt))))
+            # the final tucks under the initial, stopping clear of the bar
+            j0=jong_full-1
+            jr=(nx-55-SQ_L)/SQW
+            jl=.03 if j0 in COMPOUND_JONG else .10
+            jz=(jl, z['jong'][1], max(.30, min(.97,jr)-jl), z['jong'][3])
+            comps.append(_guard_jong(comps, component("jong%02d"%j0, jz,
+                         ROLE_FIT['jong'], align_for('jong',vt))))
     else:   # horz: vowel anchored, the initial fills everything above it (rule 2)
         jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
         _,_,jb,jt=comp_span(jc)

@@ -8,12 +8,12 @@ meta=json.load(open("meta.json"))
 OUT="glyphs_norm"; os.makedirs(OUT, exist_ok=True)
 for _f in os.listdir(OUT): os.remove(os.path.join(OUT,_f))   # no stale variants
 T_EM=80.0        # target final rendered stroke width (em)
-# optical-color compensation: compressed multi-part jamo run lighter so
-# 까/빠/않/옳 read the same gray as single-jamo syllables
-GID_BOOST={'cho01':0.88,'cho03':0.88,'cho08':0.87,'cho10':0.90,'cho13':0.89,
-           'jong01':0.88,'jong19':0.90,'jong07':0.90,
-           'jong15':0.90,'jong16':0.88,'jong24':0.88,'jong25':0.88,'jong26':0.92,
-           **{f"jong{j:02d}":0.86 for j in (2,4,5,8,9,10,11,12,13,14,17)}}
+# optical-color compensation: compressed multi-part jamo run slightly
+# lighter — mild, so strokes still read as one thickness family
+GID_BOOST={'cho01':0.93,'cho03':0.93,'cho08':0.92,'cho10':0.94,'cho13':0.93,
+           'jong01':0.93,'jong19':0.94,'jong07':0.94,
+           'jong15':0.94,'jong16':0.93,'jong24':0.93,'jong25':0.93,'jong26':0.95,
+           **{f"jong{j:02d}":0.92 for j in (2,4,5,8,9,10,11,12,13,14,17)}}
 MAX_DILATE=9.0
 PAD=12
 SPAN=1.10        # scale bucket max span

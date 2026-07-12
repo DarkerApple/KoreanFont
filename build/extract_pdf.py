@@ -217,28 +217,27 @@ def equalize_bars(gid):
             for y in range(bt+1,B+1): ink[y, a:b]|=row
     _save_g(gid, ink)
 
-def print_tieut():
-    """Rebuild ㅌ from the user's own strokes: straight ㅣ stem + three ㅡ
-    bars with exactly equal gaps (the drawn ㅌ curls into a Є shape)."""
-    W,H=_load_g('cho16').shape[::-1]            # keep the drawn ㅌ's box
-    bar=_load_g('jung18'); stem=_load_g('jung20')
-    bt=max(4,int(round(bar.shape[0]*W/bar.shape[1])))
-    sw=max(4,int(round(stem.shape[1]*H/stem.shape[0])))
-    s=_resize_mask(stem, sw, H)
-    z=np.zeros((H,W),bool)
-    z[:, :sw]|=s
-    x0=sw//2
-    for y,frac in ((0,1.0), ((H-bt)//2,0.86), (H-bt,1.0)):
-        bw=int((W-x0)*frac)
-        z[y:y+bt, x0:x0+bw]|=_resize_mask(bar, bw, bt)
+def tieut_from_dieut(dgid):
+    """ㅌ in the user's own hand: their drawn ㄷ plus a middle bar (their ㅡ)
+    attached to the stem at mid-height — keeps the curled personality."""
+    d=_load_g(dgid); H,W=d.shape
+    bar=_load_g('jung18')
+    row=d[int(H*0.44):int(H*0.56)]
+    xs=np.where(row.any(axis=0))[0]
+    x0=int(xs.min()) if len(xs) else 0
+    bw=int(W*0.86)-x0
+    bt=max(4,int(round(bar.shape[0]*bw/bar.shape[1])))
+    y0=(H-bt)//2
+    z=d.copy()
+    z[y0:y0+bt, x0:x0+bw]|=_resize_mask(bar, bw, bt)
     return z
 
 # plain ㅗㅜㅛㅠ: stems must not cross their arm
 trim_stem('jung13','u'); trim_stem('jung17','u')
 trim_stem('jung08','o'); trim_stem('jung12','o')
-# print-form ㅌ (straight stem, equal bar gaps) for cho + jong
-_T=print_tieut()
-_save_g('cho16',_T); _save_g('jong24',_T)
+# ㅌ = the drawn ㄷ + a clean middle bar (same stroke set, same curl)
+_save_g('cho16', tieut_from_dieut('cho03'))
+_save_g('jong24', tieut_from_dieut('jong06'))
 # print-topology ㅈ / ㅊ / ㅉ built from the user's own ㅡ + ㅅ (+ drawn tick)
 _Z=print_jieut(); _C=print_chieut(_Z)
 _save_g('cho12',_Z); _save_g('cho14',_C)
