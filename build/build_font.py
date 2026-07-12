@@ -5,7 +5,7 @@ from fontTools.ttLib.tables._g_l_y_f import Glyph, GlyphComponent
 from fontcommon import *
 import hangul
 
-VERSION="2.000"
+VERSION="2.001"
 
 def make_comp(components):
     """Composite glyph; bakes the global SLANT in (shear about baseline y=0).

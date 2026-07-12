@@ -92,9 +92,52 @@ def bounded_gap(fg):
         if len(g)>need: vals.append(float(np.percentile(g,25)))
     return min(vals) if vals else 1e9
 
-def adjust_iso(fg0, th, kk=None):
+def bounded_gap_axes(fg):
+    """Per-axis bounded gaps: (gx, gy) — gx guards x-dilation (side-by-side
+    strokes), gy guards y-dilation (stacked strokes/decks)."""
+    bg=~fg
+    need=max(60, int(0.025*fg.sum()))
+    out=[]
+    for axis in (1,0):
+        f=fg if axis==0 else fg.T
+        cum_d=np.maximum.accumulate(f,axis=0)
+        cum_u=np.maximum.accumulate(f[::-1],axis=0)[::-1]
+        bounded=(~f)&cum_d&cum_u
+        if axis==1: bounded=bounded.T
+        rl=runlen(bg,axis)
+        g=rl[bounded]; g=g[g>0]
+        out.append(float(np.percentile(g,25)) if len(g)>need else 1e9)
+    return out[0], out[1]
+
+def adjust_dir(fg0, th, kk=None):
+    """Directional stroke equalisation: vertical and horizontal stroke
+    widths are corrected independently (stretch-proof weight), then the
+    result is touched up isotropically. th = half-width target."""
+    k=kk if kk else min(0.68, max(0.38, 0.45*(T_EM/80.0)**1.3))
+    fg=np.pad(fg0,PAD)
+    T=2.0*th
+    for _ in range(3):
+        ry=runlen(fg,0); rx=runlen(fg,1)
+        vpx=fg&(rx<ry); hpx=fg&(ry<rx)
+        if vpx.sum()<80 or hpx.sum()<80: break
+        mv=float(np.median(rx[vpx])); mh=float(np.median(ry[hpx]))
+        if abs(mv-T)<1.5 and abs(mh-T)<1.5: break
+        gx,gy=bounded_gap_axes(fg)
+        ex=int(round(np.clip((T-mv)/2.0, -20, min(20, k*gx/2.0))))
+        ey=int(round(np.clip((T-mh)/2.0, -20, min(20, k*gy/2.0))))
+        if ex==0 and ey==0: break
+        for e,horiz in ((ex,True),(ey,False)):
+            if e==0: continue
+            st=np.ones((1,2*abs(e)+1),bool) if horiz else np.ones((2*abs(e)+1,1),bool)
+            if e>0: fg=ndimage.binary_dilation(fg, structure=st)
+            else:
+                nxt=ndimage.binary_erosion(fg, structure=st)
+                if nxt.sum()>0.25*fg.sum(): fg=nxt
+    return fg
+
+def adjust_iso(fg0, th, kk=None, prepad=True):
     """Erode/dilate isotropically to stroke half-width th (px), guarding fusion."""
-    fg0=np.pad(fg0,PAD)
+    fg0=np.pad(fg0,PAD) if prepad else fg0
     k=kk if kk else min(0.68, max(0.38, 0.45*(T_EM/80.0)**1.3))  # bold closes counters more
     cap=max(9.0, k*bounded_gap(fg0))
     dt_in=ndimage.distance_transform_edt(fg0)
@@ -114,8 +157,12 @@ def adjust_iso(fg0, th, kk=None):
             cur=(dt_out<=-c)
     return cur
 
-def emit(out_name, fg, th, kk=None):
-    out=adjust_iso(fg, th, kk)
+def emit(out_name, fg, th, kk=None, directional=False):
+    if directional:
+        out=adjust_dir(fg, th, kk)             # stretch-proof per-axis weight
+        out=adjust_iso(out, th, kk, prepad=False)
+    else:
+        out=adjust_iso(fg, th, kk)
     if not out.any():
         out=np.pad(fg,PAD)                     # never dissolve: keep the source
     ys,xs=np.where(out)
@@ -129,7 +176,7 @@ Q=1.0     # final-space raster: 1 px per em
 _WS=(T_EM/80.0)**0.7
 STRUCT_CAP={g:f*_WS for g,f in
             {'cho14':0.18,'cho18':0.16,'cho12':0.22,'cho13':0.20,
-             'cho16':0.20,'jong24':0.20,
+             'cho16':0.20,'jong24':0.20,'cho17':0.21,'jong25':0.21,
              'jong22':0.22,'jong23':0.18,'jong26':0.17,'jong04':0.20}.items()}
 n=0
 for gid,m in meta.items():
@@ -149,5 +196,5 @@ for gid,m in meta.items():
             kk=None
             if gid in STRUCT_CAP:
                 th_em=min(th_em, STRUCT_CAP[gid]*Hp); kk=0.30   # decks never fuse
-            emit(f"{gid}_{k}", fgs, (th_em*Q)/2.0, kk); n+=1
+            emit(f"{gid}_{k}", fgs, (th_em*Q)/2.0, kk, directional=True); n+=1
 print(f"normalized -> {n} bitmaps (final-space pre-stretch, isotropic weight)")

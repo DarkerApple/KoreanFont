@@ -314,6 +314,9 @@ def compose_components(cho_i, jung_i, jong_full):
         _,_,jb,jt=comp_span(jc)
         top=SQ_T-.02*SQH
         cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt+(40 if has else 45), SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
+        # interlock: the vowel's stem keys to the initial's ink centroid
+        sh=_stem_align(cho, jc, jung_i)
+        if sh: jc=(jc[0],jc[1],jc[2],jc[3]+sh,jc[4])
         comps=[cho,jc]
         if has:
             comps.append(_guard_jong(comps, component("jong%02d"%(jong_full-1),
@@ -340,6 +343,39 @@ def compose_components(cho_i, jung_i, jong_full):
     vs=max(-90.0, min(90.0, MID-(tm+bm)/2.0))
     vs=min(vs, SQ_T+8-tm)                    # never poke above the square
     return [(n,bx,by,dx,dy+vs) for (n,bx,by,dx,dy) in comps]
+
+def _ink_cx(comp):
+    """Approximate ink centroid x of a placed component (from edge profiles)."""
+    name,bx,by,dx,dy=comp
+    gid=name.replace('jamo_','')
+    p=_prof(gid)
+    W,H,_=T(gid)
+    w=W*(1000.0/H)*bx
+    if not p: return dx+w/2.0
+    tot=0.0; s=0.0
+    for L,R in zip(p['L'],p['R']):
+        if L is None: continue
+        m=(R-L); s+=(L+R)/2.0*m; tot+=m
+    return dx + (s/tot if tot else 0.5)*w
+
+def _stem_align(cho, jc, jung_i):
+    """Shift a ㅗ/ㅜ/ㅛ/ㅠ vowel so its stem(s) key into the initial's
+    centroid instead of hanging at the geometric box centre."""
+    if jung_i not in (8,12,13,17): return 0.0
+    name,bx,by,dx,dy=jc
+    gid=name.replace('jamo_','')
+    p=_prof(gid)
+    W,H,_=T(gid)
+    w=W*(1000.0/H)*bx
+    if not p: return 0.0
+    NB=len(p['L'])
+    # stem band: for ㅜ/ㅠ the lower 60% of the vowel; for ㅗ/ㅛ the upper 60%
+    idx=range(int(NB*0.4),NB) if jung_i in (13,17) else range(0,int(NB*0.6))
+    Ls=[p['L'][i] for i in idx if p['L'][i] is not None]
+    Rs=[p['R'][i] for i in idx if p['R'][i] is not None]
+    if not Ls: return 0.0
+    stem_cx=dx+((min(Ls)+max(Rs))/2.0)*w
+    return max(-38.0, min(38.0, _ink_cx(cho)-stem_cx))
 
 def _guard_jong(comps, jcomp, mingap=28):
     """Shift a final down (within the square) if it crowds the body above."""
