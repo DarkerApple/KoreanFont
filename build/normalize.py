@@ -8,7 +8,11 @@ meta=json.load(open("meta.json"))
 OUT="glyphs_norm"; os.makedirs(OUT, exist_ok=True)
 for _f in os.listdir(OUT): os.remove(os.path.join(OUT,_f))   # no stale variants
 T_EM=80.0        # target final rendered stroke width (em)
-GID_BOOST={}     # directional targeting handles ㅟ/ㅢ now
+# optical-color compensation: compressed multi-part jamo run lighter so
+# 까/빠/않/옳 read the same gray as single-jamo syllables
+GID_BOOST={'cho01':0.88,'cho03':0.88,'cho08':0.87,'cho10':0.90,'cho13':0.89,
+           'jong01':0.88,'jong19':0.90,'jong07':0.93,
+           **{f"jong{j:02d}":0.86 for j in (2,4,5,8,9,10,11,12,13,14,17)}}
 MAX_DILATE=9.0
 PAD=12
 SPAN=1.10        # scale bucket max span
@@ -127,5 +131,5 @@ for gid,m in meta.items():
             Wp=max(3,round(W*sx*Q)); Hp=max(3,round(H*sy*Q))
             im=Image.fromarray(np.where(fg,0,255).astype(np.uint8)).resize((Wp,Hp), Image.LANCZOS)
             fgs=np.asarray(im)<128
-            emit(f"{gid}_{k}", fgs, (T_EM*Q)/2.0); n+=1
+            emit(f"{gid}_{k}", fgs, (T_EM*GID_BOOST.get(gid,1.0)*Q)/2.0); n+=1
 print(f"normalized -> {n} bitmaps (final-space pre-stretch, isotropic weight)")

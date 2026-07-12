@@ -26,7 +26,7 @@ def zones(jung, has_jong):
     else:
         # batchim band sits close under the body
         if vt=='vert': return dict(cho=(.02,.02,.50,.54), jung=(.53,.02,.45,.54), jong=(.06,.56,.88,.385))
-        if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.40,.92,.20), jong=(.06,.605,.88,.35))
+        if vt=='horz': return dict(cho=(.05,.02,.90,.37), jung=(.04,.43,.92,.18), jong=(.06,.635,.88,.32))
         return dict(cho=(.01,.01,.53,.49), jung=(.27,.02,.68,.57), jong=(.06,.585,.88,.375))  # mix
 
 # per-role fill factor and alignment (ax,ay in 0..1; .5=center)
@@ -81,8 +81,9 @@ def fit_box(gid, x0, y0, x1, y1, uniform=False, ax=0.5, ay=0.5):
         s=min(bw/wu, bh/1000.0); bx=by=s
     else:
         bx=bw/wu; by=bh/1000.0
-        if bx/by>AFREE: bx=by*AFREE
-        if by/bx>AFREE: by=bx*AFREE
+        cap=1.85 if gid.startswith('cho11') else AFREE   # rings stay ring-like
+        if bx/by>cap: bx=by*cap
+        if by/bx>cap: by=bx*cap
     vg=select_by(gid,bx,by)
     Wv,Hv,_=T(vg)
     wuv=Wv*1000.0/Hv
@@ -285,6 +286,8 @@ def compose_components(cho_i, jung_i, jong_full):
     if vt=='mix':
         comps=_compose_mix(cho_i, jung_i, jong_full, has)
     elif vt=='vert':
+        if jung_i==20:   # plain ㅣ: widen the initial so the block isn't narrow
+            zx,zy,zw,zh=z['cho']; z['cho']=(zx,zy,zw+.06,zh)
         comps=[component("cho%02d"%cho_i, z['cho'], ROLE_FIT['cho'], align_for('cho',vt))]
         jc=component("jung%02d"%jung_i, z['jung'], ROLE_FIT['jung'], align_for('jung',vt))
         name,bx,by,dx,dy=jc
@@ -293,7 +296,8 @@ def compose_components(cho_i, jung_i, jong_full):
         lo=_couple2d(comps, gid, jw, dy, dy+1000.0*by, COUPLE)
         # floor: block stays wide enough for the width normaliser, but a
         # thin ㅣ bar never gets pushed out just to fill the square
-        BAR_MIN=min(_spans(comps)[0]+(0.90*SQW)/1.08-jw, SQ_L+0.62*SQW)
+        BAR_MIN=min(_spans(comps)[0]+(0.90*SQW)/1.08-jw,
+                    SQ_L+(0.67 if jung_i==20 else 0.62)*SQW)
         nx=min(max(lo, BAR_MIN), SQ_R-jw)
         comps.append((name,bx,by,nx,dy))
         if has:
@@ -307,7 +311,7 @@ def compose_components(cho_i, jung_i, jong_full):
         comps=[cho,jc]
         if has:
             comps.append(_guard_jong(comps, component("jong%02d"%(jong_full-1),
-                         jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong',vt)), mingap=22))
+                         jong_zone(jong_full-1, z['jong']), ROLE_FIT['jong'], align_for('jong',vt)), mingap=30))
     # ---- uniform block: normalise ink width, then centre in the advance ----
     mn,mx,_,_=_spans(comps)
     w=mx-mn; W_T=0.90*SQW

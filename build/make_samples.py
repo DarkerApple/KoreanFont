@@ -65,3 +65,36 @@ sheet(f"{OUT}/commercial-compare.png", [
     (NOTO,58,0,"Noto Sans KR  "+line),
     (NANUM,58,0,"NanumGothic   "+line),
 ])
+
+# 5) gray-value heatmap: per-syllable ink coverage vs sheet mean
+import numpy as np
+def coverage(f,ch,px=160):
+    im=Image.new('L',(px*2,px*2),255)
+    ImageDraw.Draw(im).text((px//2,px//2),ch,font=f,fill=0)
+    a=np.asarray(im)<128
+    if not a.any(): return 0
+    ys,xs=np.where(a)
+    return a.sum()/((xs.max()-xs.min()+1)*(ys.max()-ys.min()+1))
+def heatmap(path, chars, cols=28, cell=64):
+    f=ImageFont.truetype(LH, int(cell*0.78))
+    covs={ch:coverage(f,ch) for ch in chars}
+    m=np.mean(list(covs.values()))
+    rows=(len(chars)+cols-1)//cols
+    im=Image.new('RGB',(cols*cell+20, rows*cell+70),(255,255,255))
+    d=ImageDraw.Draw(im)
+    for i,ch in enumerate(chars):
+        x=10+(i%cols)*cell; y=10+(i//cols)*cell
+        dev=(covs[ch]-m)/m
+        if   dev> 0.25: bg=(255,150,150)     # notably darker
+        elif dev> 0.15: bg=(255,215,160)
+        elif dev<-0.25: bg=(165,190,255)     # notably lighter
+        elif dev<-0.15: bg=(205,225,255)
+        else: bg=(246,246,246)
+        d.rectangle([x,y,x+cell-2,y+cell-2], fill=bg)
+        d.text((x+cell*0.10,y+cell*0.02), ch, font=f, fill=(20,20,20))
+    d.text((12, rows*cell+22),
+           f"gray-value proof: mean ink {m*100:.0f}%  |  colored = >15% / >25% off mean "
+           f"(structural density of dense/sparse jamo)", fill=(60,60,60))
+    im.save(path); print(path, im.size)
+freqs=freq+"까따빠싸짜뚫짧닭않옳읽값웩귀쥐뭘"
+heatmap(f"{OUT}/gray-heatmap.png", freqs)
