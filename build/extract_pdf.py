@@ -316,14 +316,11 @@ def hieut_respace(gid):
         return a[ys.min():ys.max()+1, xs.min():xs.max()+1], xs.min()
     barT,bx0=tight(bar); ringT,rx0=tight(ring)
     g1=max(5,int(H*0.12)); g2=max(5,int(H*0.14))
-    if tick is not None and tick.any():
-        tickT,_=tight(tick)                    # the drawn tick, at bar weight
-        th2=max(6, int(round(barT.shape[0]*1.35)))   # a touch taller than the bar
-        tw=max(int(W*0.24), int(round(tickT.shape[1]*th2/tickT.shape[0])))
-        tw=min(tw, int(W*0.42))
-        tickT=_resize_mask(tickT, tw, th2)
-    else:
-        tickT=np.ones((max(5,int(H*0.10)),int(W*0.30)),bool)
+    # the tick is a short VERTICAL stroke (from the user's ㅣ), taller
+    stem=_load_g('jung20')
+    th2=max(9, int(H*0.18))
+    tw=max(5, barT.shape[0])
+    tickT=_resize_mask(stem, tw, th2)
     Hn=tickT.shape[0]+g1+barT.shape[0]+g2+ringT.shape[0]
     Wn=max(barT.shape[1], ringT.shape[1], tickT.shape[1])
     z=np.zeros((Hn,Wn),bool)
