@@ -316,10 +316,10 @@ def hieut_respace(gid):
         return a[ys.min():ys.max()+1, xs.min():xs.max()+1], xs.min()
     barT,bx0=tight(bar); ringT,rx0=tight(ring)
     g1=max(5,int(H*0.12)); g2=max(5,int(H*0.14))
-    # the tick is a short VERTICAL stroke (from the user's ㅣ), taller
+    # the tick is a short VERTICAL stroke (from the user's ㅣ), taller+thicker
     stem=_load_g('jung20')
     th2=max(9, int(H*0.18))
-    tw=max(5, barT.shape[0])
+    tw=max(6, int(round(barT.shape[0]*1.45)))
     tickT=_resize_mask(stem, tw, th2)
     Hn=tickT.shape[0]+g1+barT.shape[0]+g2+ringT.shape[0]
     Wn=max(barT.shape[1], ringT.shape[1], tickT.shape[1])

@@ -99,7 +99,35 @@ def heatmap(path, chars, cols=28, cell=64):
 freqs=freq+"까따빠싸짜뚫짧닭않옳읽값웩귀쥐뭘"
 heatmap(f"{OUT}/gray-heatmap.png", freqs)
 
-# 6) weight family showcase
+# 6) full text preview: all weights + reading sizes (kept in sync with builds)
+def text_preview():
+    W=2350
+    im=Image.new('L',(W,1750),255)
+    d=ImageDraw.Draw(im)
+    y=30
+    para=("다람쥐 헌 쳇바퀴에 타고파. 동해 물과 백두산이 마르고 닳도록,\n"
+          "하느님이 보우하사 우리나라 만세. 고소한 호두과자와 크림빵.\n"
+          "The quick brown fox jumps over the lazy dog — 0123456789.")
+    for fp,lab in [('Lightheaded-Light.ttf','Light'),('Lightheaded-Regular.ttf','Regular'),('Lightheaded-Bold.ttf','Bold')]:
+        import os as _o
+        if not _o.path.exists(fp): return
+        f=ImageFont.truetype(fp,64)
+        d.text((30,y), lab, font=ImageFont.truetype(fp,40), fill=120)
+        y+=64
+        for line in para.split("\n"):
+            d.text((30,y), line, font=f, fill=0); y+=92
+        y+=40
+    d.text((30,y), "12pt / 10pt", font=ImageFont.truetype('Lightheaded-Regular.ttf',40), fill=120); y+=60
+    for px in (32,26):
+        f=ImageFont.truetype('Lightheaded-Regular.ttf',px)
+        for line in para.split("\n"):
+            d.text((30,y), line, font=f, fill=0); y+=int(px*1.45)
+        y+=26
+    im.crop((0,0,W,min(1750,y+20))).save(f"{OUT}/text-preview.png")
+    print(f"{OUT}/text-preview.png")
+text_preview()
+
+# 7) weight family showcase
 import os as _os
 if all(_os.path.exists(f"Lightheaded-{s}.ttf") for s in ("Light","Regular","Bold")):
     sheet(f"{OUT}/weights.png", [
