@@ -4,7 +4,7 @@ from PIL import Image
 from vector import trace_png
 
 from PIL import ImageFilter
-MAXSIDE=420
+MAXSIDE=560
 def trace_capped(p):
     im=Image.open(p).convert('L')
     m=max(im.size)
@@ -12,11 +12,11 @@ def trace_capped(p):
     if m>MAXSIDE:
         s=MAXSIDE/m
         im=im.resize((max(2,round(im.width*s)),max(2,round(im.height*s))), Image.LANCZOS)
-    im=im.filter(ImageFilter.GaussianBlur(1.0))          # kill resample wobble
+    im=im.filter(ImageFilter.GaussianBlur(1.5))          # kill resample wobble
     arr=np.asarray(im)
     with tempfile.NamedTemporaryFile(suffix=".png",delete=False) as t:
         Image.fromarray(np.where(arr<128,0,255).astype(np.uint8)).save(t.name)
-        r=trace_png(t.name, opttolerance=1.0, alphamax=1.3)
+        r=trace_png(t.name, opttolerance=0.9, alphamax=1.35)
     os.unlink(t.name)
     return r
 src = sys.argv[1] if len(sys.argv)>1 else "glyphs_norm"
@@ -34,7 +34,7 @@ NB=24
 def profile(p):
     a=np.asarray(Image.open(p).convert('L'))<128
     H,W=a.shape
-    L=[];R=[]
+    L=[];R=[];Tp=[];Bp=[]
     for b in range(NB):
         y0=int(b*H/NB); y1=max(y0+1,int((b+1)*H/NB))
         band=a[y0:y1]
@@ -43,7 +43,14 @@ def profile(p):
             L.append(round(float(xs.min())/W,4)); R.append(round(float(xs.max()+1)/W,4))
         else:
             L.append(None); R.append(None)
-    return dict(L=L,R=R)
+        x0=int(b*W/NB); x1=max(x0+1,int((b+1)*W/NB))
+        col=a[:, x0:x1]
+        if col.any():
+            ys=np.where(col.any(axis=1))[0]
+            Tp.append(round(float(ys.min())/H,4)); Bp.append(round(float(ys.max()+1)/H,4))
+        else:
+            Tp.append(None); Bp.append(None)
+    return dict(L=L,R=R,T=Tp,B=Bp)
 profs={}
 for p in sorted(glob.glob(f"{src}/*.png")):
     profs[os.path.splitext(os.path.basename(p))[0]]=profile(p)

@@ -315,10 +315,10 @@ def hieut_respace(gid):
         ys,xs=np.where(a)
         return a[ys.min():ys.max()+1, xs.min():xs.max()+1], xs.min()
     barT,bx0=tight(bar); ringT,rx0=tight(ring)
-    g1=max(6,int(H*0.20)); g2=max(5,int(H*0.14))
+    g1=max(5,int(H*0.12)); g2=max(5,int(H*0.14))
     if tick is not None and tick.any():
         tickT,_=tight(tick)                    # the drawn tick, at bar weight
-        th2=max(5, barT.shape[0])              # stroke = the bar's thickness
+        th2=max(6, int(round(barT.shape[0]*1.35)))   # a touch taller than the bar
         tw=max(int(W*0.24), int(round(tickT.shape[1]*th2/tickT.shape[0])))
         tw=min(tw, int(W*0.42))
         tickT=_resize_mask(tickT, tw, th2)

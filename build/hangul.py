@@ -85,6 +85,8 @@ def fit_box(gid, x0, y0, x1, y1, uniform=False, ax=0.5, ay=0.5, acap=None):
         cap=acap or GID_ACAP.get(gid.split('_')[0], AFREE)
         if bx/by>cap: bx=by*cap
         if by/bx>cap: by=bx*cap
+        vb=GID_VBOOST.get(gid.split('_')[0])
+        if vb: by=min(by*vb, bh/1000.0)
     vg=select_by(gid,bx,by)
     Wv,Hv,_=T(vg)
     wuv=Wv*1000.0/Hv
@@ -118,6 +120,7 @@ AFREE=2.6            # loose anisotropy cap in free-fit mode
 # per-jamo distortion limits: ㅇ stays ring-like, ㄹ keeps its drawn
 # proportions (the user's ㄹ, scaled — never redrawn)
 GID_ACAP={'cho11':1.85, 'cho05':1.35, 'jong07':1.35}
+GID_VBOOST={'cho16':1.08, 'jong24':1.08}   # ㅌ runs a little taller
 
 def _scales_for(gid, zone, fill, trace_key=None, free=False):
     W,H,cs=T(trace_key or gid)
@@ -145,6 +148,8 @@ def _scales_for(gid, zone, fill, trace_key=None, free=False):
     if zwe>1.8*zhe: wcap=sc*1.9                   # wide-flat zone (horz-vowel context)
     sx=min(sx0, wcap, sy*A)                       # width follows the zone
     sx=max(sx, min(sy/A, sx0))
+    vb=GID_VBOOST.get(gid.split('_')[0])
+    if vb: sy=min(sy*vb, sy0)
     return sx,sy
 
 def placement_raw(gid, zone, fill, align, opt_gid=None, free=False):
@@ -314,9 +319,12 @@ def compose_components(cho_i, jung_i, jong_full):
         _,_,jb,jt=comp_span(jc)
         top=SQ_T-.02*SQH
         cho=fit_box("cho%02d"%cho_i, SQ_L+.05*SQW, jt+(40 if has else 45), SQ_L+.95*SQW, top, ax=0.5, ay=0.5)
-        # interlock: the vowel's stem keys to the initial's ink centroid
+        # interlock: the vowel's stem keys to the initial's ink centroid,
+        # and rises into the initial's notch (ㅗ under ㄱ) with safe clearance
         sh=_stem_align(cho, jc, jung_i)
         if sh: jc=(jc[0],jc[1],jc[2],jc[3]+sh,jc[4])
+        up=_vrise(cho, jc) if not has else min(_vrise(cho, jc), 40.0)
+        if up>6: jc=(jc[0],jc[1],jc[2],jc[3],jc[4]+up)
         comps=[cho,jc]
         if has:
             comps.append(_guard_jong(comps, component("jong%02d"%(jong_full-1),
@@ -343,6 +351,33 @@ def compose_components(cho_i, jung_i, jong_full):
     vs=max(-90.0, min(90.0, MID-(tm+bm)/2.0))
     vs=min(vs, SQ_T+8-tm)                    # never poke above the square
     return [(n,bx,by,dx,dy+vs) for (n,bx,by,dx,dy) in comps]
+
+def _vrise(cho, jc, want=46, maxrise=85):
+    """How far a horizontal vowel may rise so its stem nests into the
+    initial's notch (ㅗ under ㄱ) while keeping >=want vertical clearance
+    to the initial's actual ink at every x."""
+    pc=_prof(cho[0].replace('jamo_',''))
+    pj=_prof(jc[0].replace('jamo_',''))
+    if not pc or not pj or 'B' not in pc or 'T' not in pj: return 0.0
+    cl,cr,cb,ct=comp_span(cho)
+    jl,jr,jb,jt=comp_span(jc)
+    NBc=len(pc['B']); NBj=len(pj['T'])
+    rise=maxrise
+    for s in range(48):
+        x=jl+(s+0.5)/48.0*(jr-jl)
+        ji=min(NBj-1, max(0, int((x-jl)/(jr-jl)*NBj)))
+        tj=pj['T'][ji]
+        if tj is None: continue
+        vy_top=jt-tj*(jt-jb)             # vowel ink top at this x
+        if not (cl<=x<=cr):
+            gap=1e9
+        else:
+            ci=min(NBc-1, max(0, int((x-cl)/(cr-cl)*NBc)))
+            bj=pc['B'][ci]
+            gap=(ct-bj*(ct-cb))-vy_top if bj is not None else 1e9
+        rise=min(rise, gap-want)
+        if rise<=0: return 0.0
+    return max(0.0, rise)
 
 def _ink_cx(comp):
     """Approximate ink centroid x of a placed component (from edge profiles)."""
@@ -423,6 +458,8 @@ def _compose_mix(cho_i, jung_i, jong_full, has):
     bx0=max(SQ_L+.01*SQW, cl-(bw-(cr-cl))/2.0)
     btop=cb-gap
     base=fit_box(gb, bx0, btop-base_h*SQH, bx0+bw, btop)
+    up=min(_vrise(cho, base), 45.0)          # ㅗ stem nests into the initial
+    if up>6: base=(base[0],base[1],base[2],base[3],base[4]+up)
     comps.append(base)
     # bar: right, 2-D coupled with floor, spanning the body height
     bar_top=top
