@@ -1,0 +1,236 @@
+<!-- Lightheaded Regular — 수리 전/후 비교 / repair specimen -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lightheaded Regular · 수리 전/후</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  @font-face{
+    font-family:"Lightheaded Before";
+    src:url("fonts/source/Lightheaded-Regular-original.woff2") format("woff2");
+    font-display:swap;
+  }
+  @font-face{
+    font-family:"Lightheaded After";
+    src:url("fonts/Lightheaded-Regular.woff2") format("woff2");
+    font-display:swap;
+  }
+
+  :root{
+    --paper:#f3eee2; --paper2:#ece5d4; --ink:#211e1a; --ink-soft:#5a544a;
+    --cinnabar:#c1442e; --cinnabar-deep:#9c3324;
+    --line:#d8cfba; --line2:#cabfa6; --guide:#8aa0ad;
+    --sans:"Gowun Dodum",system-ui,sans-serif;
+    --serif:"Gowun Batang",serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:radial-gradient(circle at 12% 8%, rgba(193,68,46,.04), transparent 40%), var(--paper);
+    color:var(--ink); font-family:var(--sans); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:34px 22px 90px}
+
+  header.mast{border-bottom:2px solid var(--ink); padding-bottom:18px}
+  .mast-top{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+  .seal{
+    font-family:var(--serif); font-weight:700; color:#fff; background:var(--cinnabar);
+    width:46px; height:46px; display:grid; place-items:center; font-size:26px;
+    border-radius:6px; box-shadow:0 3px 0 var(--cinnabar-deep); flex:none; transform:rotate(-2deg);
+  }
+  h1{font-family:var(--serif); font-weight:700; font-size:30px; margin:0; letter-spacing:.5px}
+  h1 .en{font-family:var(--mono); font-size:12px; font-weight:400; color:var(--ink-soft);
+         letter-spacing:1px; display:block; margin-top:2px}
+  .kicker{font-family:var(--mono); font-size:11px; letter-spacing:2px; text-transform:uppercase;
+          color:var(--cinnabar); margin-left:auto}
+  .lead{color:var(--ink-soft); font-size:14px; max-width:720px; margin:14px 0 0}
+  .lead a{color:var(--cinnabar)}
+
+  .sec-h{display:flex; align-items:baseline; gap:12px; margin:38px 0 6px;
+         padding-bottom:6px; border-bottom:1px dashed var(--line2)}
+  .sec-h h2{font-family:var(--serif); font-size:20px; margin:0; font-weight:700}
+  .sec-h .meta{font-family:var(--mono); font-size:11px; color:var(--cinnabar); letter-spacing:1px}
+  .sec-h .desc{font-size:12px; color:var(--ink-soft); margin-left:auto}
+
+  .row{
+    display:grid; grid-template-columns:64px 1fr; gap:0 14px; align-items:center;
+    border:1px solid var(--line); border-radius:10px; background:#fbf8f0;
+    margin-top:12px; overflow:hidden;
+  }
+  .row + .row{margin-top:8px}
+  .row .tag{
+    font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--ink-soft); align-self:stretch; display:grid; place-items:center;
+    background:var(--paper2); border-right:1px solid var(--line);
+  }
+  .row.after .tag{background:var(--cinnabar); color:#fff}
+  .row .spec{padding:14px 18px; overflow-x:auto; white-space:nowrap}
+  .before .spec{font-family:"Lightheaded Before", sans-serif}
+  .after  .spec{font-family:"Lightheaded After", sans-serif}
+  .s-lg{font-size:46px; line-height:1.35}
+  .s-md{font-size:34px; line-height:1.4}
+  .s-sm{font-size:20px; line-height:1.7; white-space:normal}
+
+  /* a rule drawn on the real text baseline — measured, not guessed — so the
+     ㅗ / ㅛ overhang is impossible to miss */
+  .ruled .spec{position:relative}
+  .ruled .strut{display:inline-block; width:0; height:0; vertical-align:baseline}
+  .ruled .rule{position:absolute; left:0; height:0; border-top:1px solid rgba(193,68,46,.65); pointer-events:none}
+
+  table.tbl{border-collapse:collapse; margin-top:14px; width:100%; font-size:13px}
+  table.tbl th{
+    font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--ink-soft); text-align:left; padding:6px 10px; border-bottom:1.5px solid var(--ink);
+  }
+  table.tbl td{padding:6px 10px; border-bottom:1px solid var(--line)}
+  table.tbl td.num{font-family:var(--mono); text-align:right}
+  table.tbl td.drop{color:var(--cinnabar); font-family:var(--mono); text-align:right}
+  table.tbl tr:last-child td{border-bottom:none; font-weight:600}
+
+  .tnum-demo{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px}
+  .tnum-demo > div{border:1px solid var(--line); border-radius:10px; background:#fbf8f0; padding:14px 18px}
+  .tnum-demo h3{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase;
+                color:var(--ink-soft); margin:0 0 8px; font-weight:400}
+  .tnum-demo pre{font-family:"Lightheaded After",sans-serif; font-size:26px; line-height:1.35;
+                 margin:0; text-align:right}
+  .tnum-demo .tab pre{font-feature-settings:"tnum" 1}
+  @media (max-width:640px){ .tnum-demo{grid-template-columns:1fr} }
+
+  code{font-family:var(--mono); font-size:12px; background:var(--paper2);
+       border:1px solid var(--line); border-radius:4px; padding:1px 5px}
+  .note{font-size:13px; color:var(--ink-soft); margin-top:12px}
+  footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line2);
+         font-family:var(--mono); font-size:11px; color:var(--guide)}
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <div class="mast-top">
+      <div class="seal">修</div>
+      <h1>Lightheaded Regular<span class="en">REPAIR SPECIMEN · BEFORE / AFTER</span></h1>
+      <span class="kicker">v1.100</span>
+    </div>
+    <p class="lead">
+      원본 폰트의 두 가지 결함을 고쳤습니다 — <b>ㅗ·ㅛ 받침 없는 음절 25자</b>가 베이스라인 아래로 내려가
+      잘려 보이던 문제, 그리고 <b>숫자 자간</b>이 지나치게 넓고 불균등하던 문제.
+      아래는 같은 문장을 수리 전(<code>before</code>) / 후(<code>after</code>)로 나란히 놓은 것입니다.
+    </p>
+  </header>
+
+  <div class="sec-h">
+    <h2>1 · ㅗ · ㅛ 음절</h2>
+    <span class="meta">25 GLYPHS</span>
+    <span class="desc">붉은 선이 베이스라인입니다</span>
+  </div>
+
+  <div class="row before ruled"><div class="tag">Before</div><div class="spec s-lg">오늘 요리 교실 표고버섯 효도 호두</div></div>
+  <div class="row after ruled"><div class="tag">After</div><div class="spec s-lg">오늘 요리 교실 표고버섯 효도 호두</div></div>
+
+  <div class="row before ruled"><div class="tag">Before</div><div class="spec s-md">꼬 노 도 또 로 모 보 쏘 오 쪼 토 포 호</div></div>
+  <div class="row after ruled"><div class="tag">After</div><div class="spec s-md">꼬 노 도 또 로 모 보 쏘 오 쪼 토 포 호</div></div>
+
+  <div class="row before ruled"><div class="tag">Before</div><div class="spec s-md">뇨 됴 뚀 료 묘 뵤 뾰 요 쬬 툐 표 효</div></div>
+  <div class="row after ruled"><div class="tag">After</div><div class="spec s-md">뇨 됴 뚀 료 묘 뵤 뾰 요 쬬 툐 표 효</div></div>
+
+  <p class="note">
+    원본에서 이 25자는 세로로 1,030 유닛(em보다 큼)까지 뻗어 있었고 아랫부분이 −127 유닛까지 내려가
+    아랫줄과 겹쳤습니다. 같은 구조인 ㅜ·ㅠ 음절이 이미 쓰고 있던 <b>납작한 초성 변형</b>을 그대로 가져다
+    쓰고, 모음을 ㅜ·ㅠ와 같은 위치(<code>y = −23</code>)로 올렸습니다. 외곽선을 늘리거나 줄인 곳은 없어
+    획 굵기는 원본 그대로입니다.
+  </p>
+
+  <div class="sec-h">
+    <h2>2 · 숫자 자간</h2>
+    <span class="meta">10 GLYPHS · −21%</span>
+    <span class="desc">고정폭 681 → 비례폭 평균 539</span>
+  </div>
+
+  <div class="row before"><div class="tag">Before</div><div class="spec s-lg">0123456789</div></div>
+  <div class="row after"><div class="tag">After</div><div class="spec s-lg">0123456789</div></div>
+
+  <div class="row before"><div class="tag">Before</div><div class="spec s-md">전화 010-1234-5678 · ₩12,900 · 45% · 3.14</div></div>
+  <div class="row after"><div class="tag">After</div><div class="spec s-md">전화 010-1234-5678 · ₩12,900 · 45% · 3.14</div></div>
+
+  <div class="row before"><div class="tag">Before</div><div class="spec s-sm">2026년 8월 1일 오전 9시 30분, 서울 기온 27.4도, 습도 68%, 미세먼지 12㎍/㎥.</div></div>
+  <div class="row after"><div class="tag">After</div><div class="spec s-sm">2026년 8월 1일 오전 9시 30분, 서울 기온 27.4도, 습도 68%, 미세먼지 12㎍/㎥.</div></div>
+
+  <table class="tbl">
+    <tr><th>숫자</th><th>글자 폭(ink)</th><th>수리 전 폭</th><th>수리 후 폭</th><th>차이</th></tr>
+    <tr><td>0</td><td class="num">428</td><td class="num">681</td><td class="num">508</td><td class="drop">−25%</td></tr>
+    <tr><td>1</td><td class="num">255</td><td class="num">681</td><td class="num">411</td><td class="drop">−40%</td></tr>
+    <tr><td>2</td><td class="num">481</td><td class="num">681</td><td class="num">573</td><td class="drop">−16%</td></tr>
+    <tr><td>3</td><td class="num">480</td><td class="num">681</td><td class="num">564</td><td class="drop">−17%</td></tr>
+    <tr><td>4</td><td class="num">581</td><td class="num">681</td><td class="num">657</td><td class="drop">−4%</td></tr>
+    <tr><td>5</td><td class="num">470</td><td class="num">681</td><td class="num">562</td><td class="drop">−17%</td></tr>
+    <tr><td>6</td><td class="num">462</td><td class="num">681</td><td class="num">542</td><td class="drop">−20%</td></tr>
+    <tr><td>7</td><td class="num">453</td><td class="num">681</td><td class="num">541</td><td class="drop">−21%</td></tr>
+    <tr><td>8</td><td class="num">503</td><td class="num">681</td><td class="num">579</td><td class="drop">−15%</td></tr>
+    <tr><td>9</td><td class="num">376</td><td class="num">681</td><td class="num">456</td><td class="drop">−33%</td></tr>
+    <tr><td>평균</td><td class="num">449</td><td class="num">681</td><td class="num">539</td><td class="drop">−21%</td></tr>
+  </table>
+
+  <div class="sec-h">
+    <h2>3 · 표 정렬용 고정폭 숫자</h2>
+    <span class="meta">FEATURE: TNUM</span>
+    <span class="desc">자릿수를 맞춰야 할 때</span>
+  </div>
+
+  <div class="tnum-demo">
+    <div>
+      <h3>기본 (비례폭)</h3>
+      <pre>  1,204
+ 38,910
+    777
+120,065</pre>
+    </div>
+    <div class="tab">
+      <h3>font-feature-settings: "tnum"</h3>
+      <pre>  1,204
+ 38,910
+    777
+120,065</pre>
+    </div>
+  </div>
+
+  <p class="note">
+    본문에서는 좁고 자연스러운 비례폭 숫자가 기본이고, 표·가격표·타임코드처럼 자릿수가 맞아야 하는
+    곳에서는 <code>font-feature-settings:"tnum"</code> (또는 <code>font-variant-numeric:tabular-nums</code>)
+    으로 폭 641 유닛의 고정폭 숫자를 쓸 수 있습니다.
+  </p>
+
+  <div class="sec-h">
+    <h2>4 · 본문 견본</h2>
+    <span class="meta">AFTER ONLY</span>
+  </div>
+
+  <div class="row after"><div class="tag">After</div><div class="spec s-sm">다람쥐 헌 쳇바퀴에 타고파. 키스의 고유 조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다.<br>
+    오늘도 교실 뒤편에서 효자손을 든 표범이 호두를 굴리며 노래를 불렀다. 값 12,345원, 재고 678개.<br>
+    The quick brown fox jumps over the lazy dog — 0123456789.</div></div>
+
+  <footer>
+    LIGHTHEADED REGULAR v1.100 · repaired with <code>tools/repair_lightheaded.py</code> ·
+    <a href="index.html" style="color:inherit">← 작도 그리드로 돌아가기</a>
+  </footer>
+</div>
+
+<script>
+  // Draw the baseline rules where the text baseline actually is: a zero-sized
+  // inline-block aligns its bottom edge to the baseline, so its offsetTop is it.
+  function drawBaselines(){
+    document.querySelectorAll('.ruled .spec').forEach(spec=>{
+      let strut=spec.querySelector('.strut'), rule=spec.querySelector('.rule');
+      if(!strut){
+        strut=document.createElement('span'); strut.className='strut'; spec.appendChild(strut);
+        rule=document.createElement('span'); rule.className='rule'; spec.appendChild(rule);
+      }
+      rule.style.top=strut.offsetTop+'px';
+      rule.style.width=Math.max(spec.scrollWidth, spec.clientWidth)+'px';
+    });
+  }
+  // wait for the two @font-face files before measuring — fallback metrics differ
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(drawBaselines);
+  addEventListener('resize', drawBaselines);
+</script>

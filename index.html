@@ -9,6 +9,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/imagetracerjs/1.2.6/imagetracer_v1.2.6.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
+  /* 이 저장소에서 수리한 손글씨 폰트 · tools/repair_lightheaded.py 참고 */
+  @font-face{
+    font-family:"Lightheaded";
+    src:url("fonts/Lightheaded-Regular.woff2") format("woff2");
+    font-display:swap;
+  }
   :root{
     --paper:#f3eee2; --paper2:#ece5d4; --ink:#211e1a; --ink-soft:#5a544a;
     --cinnabar:#c1442e; --cinnabar-deep:#9c3324;
@@ -155,6 +161,7 @@
       <span class="kicker">상용 폰트 제작</span>
     </div>
     <p class="lead">자모와 음절을 칸 안에 직접 그리며 글꼴 설계를 잡는 작업대입니다. 셀마다 <b>호환 자모·조합용 자모·음절 코드포인트</b>가 함께 표기되고, 모임꼴별 초/중/종 배치 존과 레퍼런스 글꼴 트레이싱을 켤 수 있습니다. PNG로 내보내 FontForge·Glyphs 배경 이미지로 따라 그리세요.</p>
+    <p class="lead" style="margin-top:8px">레퍼런스 목록의 <b>라이트헤디드(수리본)</b>은 이 저장소에서 ㅗ·ㅛ 음절 25자와 숫자 자간을 고친 손글씨 폰트입니다 · <a href="specimen.html" style="color:var(--cinnabar)">수리 전/후 견본 보기 →</a></p>
   </header>
 
   <div class="toolbar">
@@ -181,6 +188,7 @@
         <option value="'Nanum Myeongjo',serif">나눔명조</option>
         <option value="'Gowun Dodum',sans-serif">고운돋움(고딕)</option>
         <option value="'Nanum Pen Script',cursive">손글씨</option>
+        <option value="'Lightheaded',cursive">라이트헤디드(수리본)</option>
       </select>
     </div>
     <div class="act">
