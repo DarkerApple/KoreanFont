@@ -121,10 +121,10 @@
     <div class="mast-top">
       <div class="seal">修</div>
       <h1>Lightheaded Regular<span class="en">REPAIR SPECIMEN · BEFORE / AFTER</span></h1>
-      <span class="kicker">v2.000</span>
+      <span class="kicker">v2.100</span>
     </div>
     <p class="lead">
-      원본 폰트의 결함 여섯 가지를 고쳤습니다. 각 항목은 같은 문장을 수리 전 <code>before</code> /
+      원본 폰트의 결함 여덟 가지를 고쳤습니다. 각 항목은 같은 문장을 수리 전 <code>before</code> /
       수리 후 <code>after</code> / 참조 폰트 <code>Gowun Dodum</code> 순으로 나란히 보여 줍니다.
       비교 기준으로는 Google Fonts의 <b>Gowun Dodum</b>과 <b>Jua</b>를 실측해 썼습니다.
     </p>
@@ -136,6 +136,8 @@
       <a href="#s5">5 · 숫자 자간</a>
       <a href="#s6">6 · 통화 기호 겹침</a>
       <a href="#s7">7 · 고정폭 숫자</a>
+      <a href="#s8">8 · 획 굵기</a>
+      <a href="#s9">9 · 자모 사이 간격</a>
     </nav>
   </header>
 
@@ -312,6 +314,55 @@
     원본에는 OpenType 피처 테이블 자체가 없었습니다.
   </p>
 
+  <!-- ================================================== 8. 획 굵기 -->
+  <div class="sec-h" id="s8">
+    <h2>8 · 획 굵기</h2>
+    <span class="meta">154 STROKE MASTERS</span>
+    <span class="desc">글자마다 굵기가 달랐습니다</span>
+  </div>
+
+  <div class="row before"><div class="tag">Before</div><div class="spec s-lg">가나다라마바사아자차카타파하</div></div>
+  <div class="row after"><div class="tag">After</div><div class="spec s-lg">가나다라마바사아자차카타파하</div></div>
+  <div class="row ref"><div class="tag">Gowun</div><div class="spec s-lg">가나다라마바사아자차카타파하</div></div>
+
+  <p class="note">
+    획 원본이 저마다 다른 크기로 그려진 뒤 필요한 만큼 축소되기 때문에, 실제로 종이에 닿는
+    펜 굵기가 획마다 <b>50에서 125 유닛</b>까지 벌어져 있었습니다 — ㅅ·ㅏ·ㅣ는 굵고
+    ㅌ·ㅍ·ㅃ·ㅗ는 가늘었습니다. 획 원본 154개를 각자의 법선 방향으로 밀어 굵기를 맞췄습니다.
+    ㅌ처럼 획 사이가 좁은 글자는 <b>세 획이 붙어버리지 않을 만큼만</b> 굵혔습니다.
+  </p>
+
+  <table class="tbl">
+    <tr><th>획 굵기(실제 렌더링)</th><th>중앙값</th><th>편차(σ)</th><th>σ/중앙값</th><th>5~95백분위</th></tr>
+    <tr><td>수리 전</td><td class="num">74.6</td><td class="num">10.1</td><td class="drop">0.135</td><td class="num">56 – 90</td></tr>
+    <tr><td>수리 후</td><td class="num">74.9</td><td class="num">8.7</td><td class="good">0.116</td><td class="good">58 – 88</td></tr>
+  </table>
+  <p class="note">폰트 전체 색(중앙값 74.6 → 74.9)은 그대로 두고 편차만 줄였습니다.</p>
+
+  <!-- ================================================== 9. 자모 간격 -->
+  <div class="sec-h" id="s9">
+    <h2>9 · 자모 사이 간격</h2>
+    <span class="meta">4,499 SYLLABLES</span>
+    <span class="desc">초성과 세로 모음 사이</span>
+  </div>
+
+  <div class="row before"><div class="tag">Before</div><div class="spec s-lg">기가나이지시히미리비</div></div>
+  <div class="row after"><div class="tag">After</div><div class="spec s-lg">기가나이지시히미리비</div></div>
+  <div class="row ref"><div class="tag">Gowun</div><div class="spec s-lg">기가나이지시히미리비</div></div>
+
+  <table class="tbl">
+    <tr><th>초성 ↔ 세로 모음 사이 흰 공간</th><th>중앙값</th><th>편차(σ)</th><th>σ/중앙값</th></tr>
+    <tr><td>수리 전</td><td class="num">54</td><td class="num">35</td><td class="drop">0.65</td></tr>
+    <tr><td>수리 후</td><td class="num">75</td><td class="num">28</td><td class="good">0.38</td></tr>
+    <tr><td>Gowun Dodum</td><td class="num">79</td><td class="num">41</td><td class="num">0.52</td></tr>
+    <tr><td>Jua</td><td class="num">62</td><td class="num">35</td><td class="num">0.56</td></tr>
+  </table>
+  <p class="note">
+    간격은 <b>초성과 모음을 절반씩</b> 움직여 맞췄기 때문에 글자의 좌우 중심은 그대로입니다.
+    한 글자당 최대 30 유닛까지만 움직여, 이 폰트가 가진 <b>바깥 여백의 일관성</b>(편차 4.7,
+    두 참조 폰트보다 훨씬 균일)을 잃지 않도록 했습니다.
+  </p>
+
   <!-- ================================================== 본문 -->
   <div class="sec-h">
     <h2>본문 견본</h2>
@@ -323,7 +374,7 @@
     안녕하세요. 왕용영정성징 · 강공광 · 오우으이안온옹앙 · The quick brown fox 0123456789.</div></div>
 
   <footer>
-    LIGHTHEADED REGULAR v2.000 · repaired with <code>tools/repair_lightheaded.py</code> ·
+    LIGHTHEADED REGULAR v2.100 · repaired with <code>tools/repair_lightheaded.py</code> ·
     references measured from Gowun Dodum &amp; Jua (Google Fonts) ·
     <a href="index.html" style="color:inherit">← 작도 그리드로 돌아가기</a>
   </footer>

@@ -45,6 +45,8 @@ Requires: fonttools (plus brotli if you also want the .woff2)
 """
 
 import copy
+import math
+import statistics
 import sys
 
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
@@ -101,8 +103,30 @@ TABULAR_SIDE_BEARING = 30   # air around the widest figure in the tabular set
 CURRENCY_SIDE_BEARING = 45  # ₩ € ¥ — advances that actually contain the ink
 CURRENCY = {0x20A9: "won", 0x20AC: "Euro", 0x00A5: "yen"}
 
-VERSION = "Version 2.000"
-FONT_REVISION = 2.0
+# --- stroke weight ---------------------------------------------------------
+# Every stroke master is drawn at its own size and then scaled to fit, so the
+# pen that reaches the page ranges from 48 to 112 units depending on which
+# stroke you are looking at.  Each master is offset along its own normals until
+# it renders at one weight.  68 is the font's own median, so most masters barely
+# move (median correction: 9% of the master's pen).
+PEN_TARGET = 75          # the font's own usage-weighted median
+PEN_FLATTEN_STEPS = 6      # curve subdivision when measuring
+PEN_SCANLINES = 80
+PEN_MIN_COUNTER = 26       # white left between two strokes of the same jamo
+PEN_MAX_CHANGE = 0.28      # never move a stroke more than this much of its pen
+PEN_PASSES = 2             # offsetting changes the measurement, so measure again
+
+# --- gaps between the jamo of a syllable -----------------------------------
+# The white between the lead consonant and a vertical vowel runs from 20 units
+# (ㅔ) to 147 (ㅣ), because the vowel's own width varies while the syllable's
+# edges do not.  Even it out, but gently: the syllable's outer margins are
+# currently far more consistent than either reference font's and are worth
+# keeping.
+GAP_TARGET = 75
+GAP_MAX_SHIFT = 30         # total change to any one syllable's interior gap
+
+VERSION = "Version 2.100"
+FONT_REVISION = 2.1
 
 
 def main(src, dst):
@@ -136,6 +160,8 @@ def main(src, dst):
 
     repair_vertical_vowel_syllables(font, glyf, bounds)
     normalise_ieung(font, glyf, hmtx, component_box)
+    normalise_stroke_weight(font, glyf)
+    even_out_jamo_gaps(font, glyf, component_box)
     rescale_compat_jamo(font, glyf, bounds, component_box)
     respace_hangul(font, glyf, hmtx, bounds)
     respace_figures(font, glyf, hmtx, bounds)
@@ -287,6 +313,204 @@ def normalise_ieung(font, glyf, hmtx, component_box):
         print(f"2. ieung {role:4} n={n:4}  {widths[n // 2]:.0f} x {heights[n // 2]:.0f}"
               f"   (height {heights[0]:.0f}..{heights[-1]:.0f})")
 
+
+
+# ------------------------------------------------------- 2b. stroke weight
+def _flatten(pen_value, steps):
+    """Recorded pen output -> polygons, so we can take scanline measurements."""
+    polys, cur, last = [], [], None
+    for op, args in pen_value:
+        if op == "moveTo":
+            cur = [args[0]]; last = args[0]
+        elif op == "lineTo":
+            cur.append(args[0]); last = args[0]
+        elif op == "qCurveTo":
+            points = list(args); on, offs, prev = points[-1], points[:-1], last
+            for i, c in enumerate(offs):
+                nxt = ((c[0] + offs[i + 1][0]) / 2, (c[1] + offs[i + 1][1]) / 2) \
+                    if i + 1 < len(offs) else on
+                for step in range(1, steps + 1):
+                    t = step / steps
+                    cur.append(((1 - t) ** 2 * prev[0] + 2 * (1 - t) * t * c[0] + t * t * nxt[0],
+                                (1 - t) ** 2 * prev[1] + 2 * (1 - t) * t * c[1] + t * t * nxt[1]))
+                prev = nxt
+            last = on
+        elif op == "curveTo":
+            p0, (p1, p2, p3) = last, args
+            for step in range(1, steps + 1):
+                t = step / steps
+                cur.append(((1 - t) ** 3 * p0[0] + 3 * (1 - t) ** 2 * t * p1[0]
+                            + 3 * (1 - t) * t * t * p2[0] + t ** 3 * p3[0],
+                            (1 - t) ** 3 * p0[1] + 3 * (1 - t) ** 2 * t * p1[1]
+                            + 3 * (1 - t) * t * t * p2[1] + t ** 3 * p3[1]))
+            last = p3
+        elif op in ("closePath", "endPath"):
+            if len(cur) > 2:
+                polys.append(cur)
+            cur = []
+    if len(cur) > 2:
+        polys.append(cur)
+    return polys
+
+
+def _ink_runs(polys, axis, count, white=None):
+    """Lengths of the ink crossings along `count` scanlines."""
+    values = [p[axis ^ 1] for poly in polys for p in poly]
+    lo, hi = min(values), max(values)
+    if hi - lo < 2:
+        return []
+    out = []
+    for i in range(1, count):
+        line = lo + (hi - lo) * i / count
+        crossings = []
+        for poly in polys:
+            n = len(poly)
+            for j in range(n):
+                a, b = poly[j], poly[(j + 1) % n]
+                a_on, b_on = a[axis ^ 1], b[axis ^ 1]
+                if (a_on <= line < b_on) or (b_on <= line < a_on):
+                    t = (line - a_on) / (b_on - a_on)
+                    crossings.append(a[axis] + t * (b[axis] - a[axis]))
+        crossings.sort()
+        out += [crossings[k + 1] - crossings[k] for k in range(0, len(crossings) - 1, 2)
+                if crossings[k + 1] - crossings[k] > 1]
+        if white is not None:
+            white += [crossings[k + 2] - crossings[k + 1] for k in range(0, len(crossings) - 2, 2)
+                      if crossings[k + 2] - crossings[k + 1] > 1]
+    return out
+
+
+def measure_pen(glyph_set, name):
+    """The master's typical stroke thickness, and the narrowest white gap inside
+    it — thicken a ㅌ past that and its three bars merge into a block."""
+    from fontTools.pens.recordingPen import RecordingPen
+    pen = RecordingPen()
+    glyph_set[name].draw(pen)
+    polys = _flatten(pen.value, PEN_FLATTEN_STEPS)
+    if not polys:
+        return None, None
+    white = []
+    runs = sorted(_ink_runs(polys, 0, PEN_SCANLINES, white)
+                  + _ink_runs(polys, 1, PEN_SCANLINES, white))
+    if len(runs) < 8:
+        return None, None
+    white.sort()
+    gap = white[len(white) // 20] if len(white) >= 20 else (white[0] if white else None)
+    # a low percentile finds the thinnest stroke; take the median of everything
+    # near it so a ㅌ is judged by its bars, not by its one thin stem, and a long
+    # stem still contributes its width rather than its length
+    thin = runs[len(runs) // 5]
+    band = [r for r in runs if 0.5 * thin <= r <= 2.5 * thin]
+    return statistics.median(band), gap
+
+
+def _signed_area(ring):
+    total = 0.0
+    for i in range(len(ring)):
+        x0, y0 = ring[i]
+        x1, y1 = ring[(i + 1) % len(ring)]
+        total += x0 * y1 - x1 * y0
+    return total / 2
+
+
+def offset_outline(glyph, delta):
+    """Push every point away from the ink by `delta`, thickening the stroke.
+    Winding decides which way is out, so counters close as the stroke grows."""
+    coords, end_points, _ = glyph.getCoordinates(None)
+    points = list(coords)
+    start = 0
+    for end in end_points:
+        index = list(range(start, end + 1))
+        start = end + 1
+        ring = [points[i] for i in index]
+        if len(ring) < 3:
+            continue
+        direction = 1.0 if _signed_area(ring) < 0 else -1.0
+        n = len(ring)
+        for k, i in enumerate(index):
+            before, after = ring[(k - 1) % n], ring[(k + 1) % n]
+            tx, ty = after[0] - before[0], after[1] - before[1]
+            length = math.hypot(tx, ty)
+            if length < 1e-6:
+                continue
+            points[i] = (points[i][0] - ty / length * direction * delta,
+                         points[i][1] + tx / length * direction * delta)
+    glyph.coordinates = type(coords)([(round(x), round(y)) for x, y in points])
+
+
+def normalise_stroke_weight(font, glyf):
+    glyph_set = font.getGlyphSet()
+
+    # what scale does each master actually reach the page at?
+    scales = {}
+    for name in font.getGlyphOrder():
+        glyph = glyf[name]
+        if glyph.numberOfContours != -1:
+            continue
+        for comp in glyph.components:
+            sx, sy = comp.transform[0][0], comp.transform[1][1]
+            scales.setdefault(comp.glyphName, []).append((sx + sy) / 2)
+
+    first, moved = None, set()
+    for _ in range(PEN_PASSES):
+        rendered = []
+        for name, used in scales.items():
+            glyph = glyf[name]
+            if glyph.numberOfContours <= 0:
+                continue
+            pen, counter = measure_pen(glyph_set, name)
+            if not pen:
+                continue
+            scale = statistics.median(used)
+            rendered.append(pen * scale)
+            delta = (PEN_TARGET / scale - pen) / 2
+            limit = PEN_MAX_CHANGE * pen / 2
+            if counter is not None:
+                # leave enough white that neighbouring strokes stay apart
+                limit = min(limit, max(0.0, (counter - PEN_MIN_COUNTER / scale) / 2))
+            delta = max(-limit, min(limit, delta))
+            if abs(delta) < 1:
+                continue
+            offset_outline(glyph, delta)
+            glyph.recalcBounds(glyf)
+            moved.add(name)
+        if first is None:
+            first = rendered
+        last = rendered
+
+    def spread(values):
+        return statistics.pstdev(values) / statistics.median(values)
+    print(f"2b. stroke weight: {len(moved)} masters offset to a {PEN_TARGET}-unit pen"
+          f"   ({min(first):.0f}..{max(first):.0f} -> {min(last):.0f}..{max(last):.0f},"
+          f" spread {spread(first):.3f} -> {spread(last):.3f})")
+
+
+# ------------------------------------------------------ 2c. jamo gaps
+def even_out_jamo_gaps(font, glyf, component_box):
+    """Pull the white between a lead consonant and a vertical vowel toward one
+    value by moving the two apart or together, half from each side so the
+    syllable stays centred."""
+    cmap = font.getBestCmap()
+    vowels = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+    simple = set("ㅏㅐㅑㅒㅓㅔㅕㅖㅣ")
+    before, after, touched = [], [], 0
+    for cp in range(SYLLABLE_BASE, SYLLABLE_END):
+        _, vowel_index, _ = decompose(cp)
+        if vowels[vowel_index] not in simple:
+            continue
+        parts = glyf[cmap[cp]].components
+        lead, vowel = parts[0], parts[1]
+        gap = component_box(vowel)[0] - component_box(lead)[2]
+        before.append(gap)
+        shift = max(-GAP_MAX_SHIFT, min(GAP_MAX_SHIFT, GAP_TARGET - gap))
+        if abs(shift) >= 2:
+            lead.x -= round(shift / 2)
+            vowel.x += shift - round(shift / 2)
+            touched += 1
+        after.append(gap + shift)
+    print(f"2c. jamo gaps: {touched} syllables nudged   "
+          f"median {statistics.median(before):.0f} -> {statistics.median(after):.0f}, "
+          f"sigma {statistics.pstdev(before):.0f} -> {statistics.pstdev(after):.0f}")
 
 # ------------------------------------------------- 3. standalone compat jamo
 def rescale_compat_jamo(font, glyf, bounds, component_box):
