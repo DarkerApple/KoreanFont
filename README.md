@@ -10,7 +10,7 @@
 | [`fonts/Lightheaded-Regular.ttf`](fonts/) | 수리본 (`.woff2` 동봉, 288 KB) |
 | [`fonts/source/`](fonts/source/) | 원본 (비교·재빌드용) |
 | [`tools/repair_lightheaded.py`](tools/repair_lightheaded.py) | 재현 가능한 수리 스크립트 |
-| [`minecraft/`](minecraft/) | **마인크래프트 128×128 폰트 리소스팩** (영문) |
+| [`minecraft/`](minecraft/) | **마인크래프트 폰트 리소스팩** — 폰트 실물을 그대로 넣습니다 (영문) |
 
 비교 기준은 Google Fonts의 **Gowun Dodum**과 **Jua**를 내려받아 직접 실측했습니다.
 
