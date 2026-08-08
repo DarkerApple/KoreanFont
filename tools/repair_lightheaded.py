@@ -125,6 +125,23 @@ PEN_PASSES = 2             # offsetting changes the measurement, so measure agai
 GAP_TARGET = 75
 GAP_MAX_SHIFT = 30         # total change to any one syllable's interior gap
 
+# A compound vowel (ㅘ ㅙ ㅝ ㅞ …) is two strokes: one under the lead consonant
+# and one standing to its right.  Bounding boxes cannot tell whether those two
+# clear each other, so this is measured on the outlines.  ㅞ fails badly — its
+# ㅜ bar runs straight through the ㅔ stems, ink into ink.
+COMPOUND_CLEARANCE = 50
+COMPOUND_INK_LEFT = 96     # how far left the syllable's ink may reach
+                           # (these are pre-centring numbers; pass 4 shifts
+                           #  everything -38, landing them on 58 and 840)
+COMPOUND_INK_RIGHT = 878   # and how far right
+COMPOUND_MAX_SQUEEZE = 0.14   # last resort: narrow the stroke under the lead
+
+# ㅗ and ㅛ syllables with a final consonant reach 14-16 units higher than every
+# other syllable, so the top line of a line of text is not level.
+TOPLINE_TOLERANCE = 8
+TOPLINE_MAX_DROP = 18
+TOPLINE_MIN_GAP = 34       # white to leave under the stroke we are lowering
+
 VERSION = "Version 2.100"
 FONT_REVISION = 2.1
 
@@ -162,6 +179,8 @@ def main(src, dst):
     normalise_ieung(font, glyf, hmtx, component_box)
     normalise_stroke_weight(font, glyf)
     even_out_jamo_gaps(font, glyf, component_box)
+    separate_compound_vowels(font, glyf, component_box)
+    level_top_line(font, glyf, component_box)
     rescale_compat_jamo(font, glyf, bounds, component_box)
     respace_hangul(font, glyf, hmtx, bounds)
     respace_figures(font, glyf, hmtx, bounds)
@@ -511,6 +530,159 @@ def even_out_jamo_gaps(font, glyf, component_box):
     print(f"2c. jamo gaps: {touched} syllables nudged   "
           f"median {statistics.median(before):.0f} -> {statistics.median(after):.0f}, "
           f"sigma {statistics.pstdev(before):.0f} -> {statistics.pstdev(after):.0f}")
+
+
+# --------------------------------------------- 2d. compound vowels that touch
+def _component_polygons(glyf, glyph_set, comp):
+    from fontTools.misc.transform import Transform
+    from fontTools.pens.recordingPen import RecordingPen
+    pen = RecordingPen()
+    glyph_set[comp.glyphName].draw(pen)
+    t = comp.transform
+    move = Transform(t[0][0], t[0][1], t[1][0], t[1][1], comp.x, comp.y)
+    return [[move.transformPoint(p) for p in poly]
+            for poly in _flatten(pen.value, PEN_FLATTEN_STEPS)]
+
+
+def _edge(polys, y, rightmost):
+    xs = []
+    for poly in polys:
+        n = len(poly)
+        for j in range(n):
+            a, b = poly[j], poly[(j + 1) % n]
+            if (a[1] <= y < b[1]) or (b[1] <= y < a[1]):
+                t = (y - a[1]) / (b[1] - a[1])
+                xs.append(a[0] + t * (b[0] - a[0]))
+    if not xs:
+        return None
+    return max(xs) if rightmost else min(xs)
+
+
+def _ink_clearance(right_polys, left_polys, steps=160):
+    """Narrowest white between the standing vowel and everything to its left."""
+    ys = [p[1] for poly in right_polys for p in poly]
+    lo, hi = min(ys), max(ys)
+    best = None
+    for i in range(1, steps):
+        y = lo + (hi - lo) * i / steps
+        r = _edge(right_polys, y, False)
+        l = _edge(left_polys, y, True)
+        if r is None or l is None:
+            continue
+        gap = r - l
+        if best is None or gap < best:
+            best = gap
+    return best
+
+
+def separate_compound_vowels(font, glyf, component_box):
+    glyph_set = font.getGlyphSet()
+    cmap = font.getBestCmap()
+    vowels = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+    compound = set("ㅘㅙㅚㅝㅞㅟㅢ")
+
+    plan, before, after = {}, [], []
+    fixed, fixed_shift = {}, {}
+    for cp in range(SYLLABLE_BASE, SYLLABLE_END):
+        _, vowel_index, _ = decompose(cp)
+        if vowels[vowel_index] not in compound:
+            continue
+        parts = glyf[cmap[cp]].components
+        if len(parts) < 3:
+            continue
+        lead, under, standing = parts[0], parts[1], parts[2]
+        key = tuple((c.glyphName, c.x, c.y, round(c.transform[0][0], 4), round(c.transform[1][1], 4))
+                    for c in (lead, under, standing))
+        if key not in plan:
+            right = _component_polygons(glyf, glyph_set, standing)
+            left = (_component_polygons(glyf, glyph_set, lead)
+                    + _component_polygons(glyf, glyph_set, under))
+            gap = _ink_clearance(right, left)
+            plan[key] = gap
+        gap = plan[key]
+        if gap is None:
+            continue
+        before.append(gap)
+        if gap >= COMPOUND_CLEARANCE:
+            after.append(gap)
+            continue
+        if key in fixed:
+            after.append(fixed[key])
+            standing.x += fixed_shift[key][0]
+            under.x -= fixed_shift[key][1]
+            if fixed_shift[key][2]:
+                under.transform = [[fixed_shift[key][2], under.transform[0][1]],
+                                   [under.transform[1][0], under.transform[1][1]]]
+                under.x = fixed_shift[key][3]
+            continue
+
+        need = COMPOUND_CLEARANCE - gap
+        squeezed_scale, squeezed_x = None, None
+        # push the standing stroke right, as far as the syllable's edge allows
+        room = COMPOUND_INK_RIGHT - component_box(standing)[2]
+        push = max(0, min(need, room))
+        standing.x += round(push)
+        need -= push
+        # pull the stroke under the lead left, as far as the other edge allows
+        under_box = component_box(under)
+        pull = max(0, min(need, under_box[0] - COMPOUND_INK_LEFT))
+        under.x -= round(pull)
+        need -= pull
+        # and only then narrow it, anchored at its (new) left edge
+        if need > 1:
+            width = under_box[2] - under_box[0]
+            squeeze = min(need / width, COMPOUND_MAX_SQUEEZE)
+            left_edge = under_box[0] - pull
+            under.transform = [[under.transform[0][0] * (1 - squeeze), under.transform[0][1]],
+                               [under.transform[1][0], under.transform[1][1]]]
+            under.x = round(left_edge - glyf[under.glyphName].xMin * under.transform[0][0])
+            squeezed_scale, squeezed_x = under.transform[0][0], under.x
+            need -= squeeze * width
+        # measure again rather than trusting the arithmetic
+        fixed_shift[key] = (round(push), round(pull), squeezed_scale, squeezed_x)
+        fixed[key] = _ink_clearance(
+            _component_polygons(glyf, glyph_set, standing),
+            _component_polygons(glyf, glyph_set, lead)
+            + _component_polygons(glyf, glyph_set, under))
+        after.append(fixed[key])
+
+    print(f"2d. compound vowels: {sum(1 for g in before if g < COMPOUND_CLEARANCE)} of {len(before)}"
+          f" were closer than {COMPOUND_CLEARANCE} units"
+          f"   clearance {min(before):.0f}..{max(before):.0f} -> {min(after):.0f}..{max(after):.0f}")
+
+
+# ------------------------------------------------------- 2e. level the top
+def level_top_line(font, glyf, component_box):
+    """ㅗ and ㅛ syllables sit 14-16 units proud of every other syllable."""
+    cmap = font.getBestCmap()
+    tops = {}
+    for cp in range(SYLLABLE_BASE, SYLLABLE_END):
+        glyph = glyf[cmap[cp]]
+        glyph.recalcBounds(glyf)
+        tops[cp] = glyph.yMax
+    common = statistics.median(tops.values())
+
+    lowered, before, after = 0, [], []
+    for cp, top in tops.items():
+        before.append(top)
+        excess = top - common
+        if excess <= TOPLINE_TOLERANCE:
+            after.append(top)
+            continue
+        parts = glyf[cmap[cp]].components
+        boxes = [component_box(c) for c in parts]
+        highest = max(range(len(parts)), key=lambda i: boxes[i][3])
+        under = [b[3] for i, b in enumerate(boxes) if i != highest and b[3] < boxes[highest][3] - 50]
+        room = (boxes[highest][1] - (max(under) + TOPLINE_MIN_GAP)) if under else TOPLINE_MAX_DROP
+        drop = max(0, min(excess - TOPLINE_TOLERANCE / 2, TOPLINE_MAX_DROP, room))
+        if drop >= 2:
+            parts[highest].y -= round(drop)
+            glyf[cmap[cp]].recalcBounds(glyf)
+            lowered += 1
+        after.append(top - drop)
+
+    print(f"2e. top line: {lowered} syllables lowered onto the common top ({common:.0f})"
+          f"   spread {statistics.pstdev(before):.1f} -> {statistics.pstdev(after):.1f}")
 
 # ------------------------------------------------- 3. standalone compat jamo
 def rescale_compat_jamo(font, glyf, bounds, component_box):
