@@ -72,7 +72,15 @@ BROKEN_BELOW = -60
 IEUNG_BASE = "glyph00277"
 IEUNG_MASTER = "ieung.norm"
 IEUNG_RING_TIGHTEN = 0.927
-IEUNG_AR = 1.15          # Gowun Dodum's ieung sits between 1.04 and 1.29
+# Gowun Dodum draws its ㅇ rounder when it stands beside a vertical vowel
+# (448x432, ar 1.04) than when it sits above a horizontal one (497x407, 1.22).
+# Beside a vowel the width is fixed by the vowel, so a rounder ratio is what
+# buys the height that stops the ㅇ floating near the cap line.
+IEUNG_AR = 1.15          # above a horizontal vowel, or as a final
+IEUNG_AR_BESIDE = 1.02   # beside a vertical vowel
+IEUNG_TOP_INSET = 110    # how far below the vowel's top the ㅇ starts (Gowun: 109)
+IEUNG_MAX_UNDER = 190    # most white to leave under a ㅇ that sits above a vowel
+IEUNG_MIN_HEIGHT = 330   # give the inset back before shrinking the circle
 IEUNG_H_LEAD = 400
 IEUNG_H_TAIL = 350
 IEUNG_GAP_LEAD = 38      # smallest gap left to the stroke underneath
@@ -112,9 +120,10 @@ CURRENCY = {0x20A9: "won", 0x20AC: "Euro", 0x00A5: "yen"}
 PEN_TARGET = 75          # the font's own usage-weighted median
 PEN_FLATTEN_STEPS = 6      # curve subdivision when measuring
 PEN_SCANLINES = 80
-PEN_MIN_COUNTER = 26       # white left between two strokes of the same jamo
+PEN_MIN_COUNTER = 22       # white left between two strokes of the same jamo
 PEN_MAX_CHANGE = 0.28      # never move a stroke more than this much of its pen
 PEN_PASSES = 2             # offsetting changes the measurement, so measure again
+PEN_KEEP_ONLY_IF_BETTER = True   # see below: thinning can delete a thin feature
 
 # --- gaps between the jamo of a syllable -----------------------------------
 # The white between the lead consonant and a vertical vowel runs from 20 units
@@ -136,14 +145,23 @@ COMPOUND_INK_LEFT = 96     # how far left the syllable's ink may reach
 COMPOUND_INK_RIGHT = 878   # and how far right
 COMPOUND_MAX_SQUEEZE = 0.14   # last resort: narrow the stroke under the lead
 
+# Final consonants occupy 0.54 of the syllable against Gowun Dodum's 0.67, and
+# ㄹ shows it worst: three bars in 296 units leaves 35 of white between them.
+# Growing the band *before* the stroke-weight pass is what makes this work — the
+# bars are then thinned back to the standard pen, so the counters open up
+# instead of scaling with everything else.
+FINAL_BOTTOM = -50       # a final may drop this far below the baseline
+FINAL_GAP = 22           # white kept between the final and the vowel above it
+FINAL_MAX_GROWTH = 1.18
+
 # ㅗ and ㅛ syllables with a final consonant reach 14-16 units higher than every
 # other syllable, so the top line of a line of text is not level.
 TOPLINE_TOLERANCE = 8
 TOPLINE_MAX_DROP = 18
 TOPLINE_MIN_GAP = 34       # white to leave under the stroke we are lowering
 
-VERSION = "Version 2.100"
-FONT_REVISION = 2.1
+VERSION = "Version 2.300"
+FONT_REVISION = 2.3
 
 
 def main(src, dst):
@@ -177,6 +195,7 @@ def main(src, dst):
 
     repair_vertical_vowel_syllables(font, glyf, bounds)
     normalise_ieung(font, glyf, hmtx, component_box)
+    deepen_finals(font, glyf, component_box)
     normalise_stroke_weight(font, glyf)
     even_out_jamo_gaps(font, glyf, component_box)
     separate_compound_vowels(font, glyf, component_box)
@@ -302,22 +321,38 @@ def normalise_ieung(font, glyf, hmtx, component_box):
                 height = IEUNG_H_LEAD
                 if under:
                     height = min(height, box[3] - (max(under) + IEUNG_GAP_LEAD))
-                width = height * IEUNG_AR
-                # nor sideways into a vowel standing to its right.  Never reach
+                # a vowel standing to the right fixes the width; never reach
                 # further right than the ㅇ already did, so no overlap that the
-                # design already tolerates can get worse.
-                beside = [o[0] for o in others
+                # design already tolerates can get worse
+                beside = [(o[0], o[3]) for o in others
                           if o[0] > (box[0] + box[2]) / 2 and o[3] > box[1] and o[1] < box[3]]
                 if beside:
                     anchor = box[0]          # a ㅇ in the left column keeps its margin
-                    limit = max(box[2], min(beside) - IEUNG_GAP_LEAD)
-                    width = min(width, limit - anchor)
-                    height = min(height, width / IEUNG_AR)
-                    width = height * IEUNG_AR
-                    left = anchor
+                    limit = max(box[2], min(o[0] for o in beside) - IEUNG_GAP_LEAD)
+                    width = min(height * IEUNG_AR_BESIDE, limit - anchor)
+                    height = width / IEUNG_AR_BESIDE
+                    # sit a fixed distance below the vowel's own top rather than
+                    # hugging the cap line, or the ㅇ reads as floating high
+                    top = max(o[1] for o in beside) - IEUNG_TOP_INSET
+                    if under:
+                        floor = max(under) + IEUNG_GAP_LEAD
+                        if top - height < floor:
+                            # hand the inset back before shrinking the circle --
+                            # 왼 왠 웬 lost a third of their ㅇ the other way round
+                            top = min(box[3], floor + height)
+                        if top - height < floor:
+                            height = max(top - floor, IEUNG_MIN_HEIGHT)
+                            width = height * IEUNG_AR_BESIDE
+                    place(me, width, height, anchor, top - height)
                 else:
-                    left = centre - width / 2
-                place(me, width, height, left, box[3] - height)
+                    width = height * IEUNG_AR
+                    # do not leave a hole under it either: 으 used to hang 386
+                    # units above its ㅡ while 그 and 프 filled that space
+                    bottom = box[3] - height
+                    if under:
+                        floor = max(under) + IEUNG_GAP_LEAD
+                        bottom = min(bottom, floor + IEUNG_MAX_UNDER)
+                    place(me, width, height, centre - width / 2, bottom)
             else:
                 bottom = min(box[1], IEUNG_TAIL_OVERSHOOT)
                 height = min(IEUNG_H_TAIL, min(o[1] for o in others) - IEUNG_GAP_TAIL - bottom)
@@ -333,6 +368,44 @@ def normalise_ieung(font, glyf, hmtx, component_box):
               f"   (height {heights[0]:.0f}..{heights[-1]:.0f})")
 
 
+
+
+# ------------------------------------------------- 2b0. give finals more room
+def deepen_finals(font, glyf, component_box):
+    """Final consonants get 0.54 of the syllable here against Gowun Dodum's
+    0.67.  ㄹ suffers most — three bars in 296 units leave 35 of white between
+    them.  Stretch the band down below the baseline and up into the gap; the
+    stroke-weight pass runs next and thins the bars back to the standard pen, so
+    the counters open instead of scaling along with everything else."""
+    cmap = font.getBestCmap()
+    grown, before, after = 0, [], []
+    for cp in range(SYLLABLE_BASE, SYLLABLE_END):
+        _, _, tail = decompose(cp)
+        if not tail:
+            continue
+        parts = glyf[cmap[cp]].components
+        final = parts[-1]
+        if final.glyphName == IEUNG_MASTER:
+            continue                      # the ㅇ is round and already placed
+        box = component_box(final)
+        height = box[3] - box[1]
+        before.append(height)
+        ceiling = min(component_box(c)[1] for c in parts[:-1]) - FINAL_GAP
+        target = min(ceiling, box[3] + 40) - FINAL_BOTTOM
+        factor = min(target / height, FINAL_MAX_GROWTH)
+        if factor <= 1.01:
+            after.append(height)
+            continue
+        sub = glyf[final.glyphName]
+        sub.recalcBounds(glyf)
+        scale = final.transform[1][1] * factor
+        final.transform = [[final.transform[0][0], final.transform[0][1]],
+                           [final.transform[1][0], scale]]
+        final.y = round(FINAL_BOTTOM - sub.yMin * scale)
+        grown += 1
+        after.append(height * factor)
+    print(f"2b0. finals: {grown} deepened   median height "
+          f"{statistics.median(before):.0f} -> {statistics.median(after):.0f}")
 
 # ------------------------------------------------------- 2b. stroke weight
 def _flatten(pen_value, steps):
@@ -470,7 +543,7 @@ def normalise_stroke_weight(font, glyf):
             sx, sy = comp.transform[0][0], comp.transform[1][1]
             scales.setdefault(comp.glyphName, []).append((sx + sy) / 2)
 
-    first, moved = None, set()
+    first, moved, reverted = None, set(), set()
     for _ in range(PEN_PASSES):
         rendered = []
         for name, used in scales.items():
@@ -484,14 +557,29 @@ def normalise_stroke_weight(font, glyf):
             rendered.append(pen * scale)
             delta = (PEN_TARGET / scale - pen) / 2
             limit = PEN_MAX_CHANGE * pen / 2
-            if counter is not None:
-                # leave enough white that neighbouring strokes stay apart
+            if counter is not None and delta > 0:
+                # only thickening can close a counter; thinning always opens it,
+                # which is why ㅅ and ㅈ used to sit stuck at 98 and 84
                 limit = min(limit, max(0.0, (counter - PEN_MIN_COUNTER / scale) / 2))
             delta = max(-limit, min(limit, delta))
             if abs(delta) < 1:
                 continue
+
+            # Offsetting inward does not just thin a stroke, it can delete a
+            # thin one: the ㅂ masters lost their bottom bar outright and came
+            # out as a pair of horns.  So do it, measure again, and put the
+            # glyph back if it did not actually get closer to the target.
+            before_coords = glyph.coordinates.copy()
             offset_outline(glyph, delta)
             glyph.recalcBounds(glyf)
+            checked, _ = measure_pen(glyph_set, name)
+            if checked is None or (PEN_KEEP_ONLY_IF_BETTER and
+                                   abs(checked * scale - PEN_TARGET) >=
+                                   abs(pen * scale - PEN_TARGET)):
+                glyph.coordinates = before_coords
+                glyph.recalcBounds(glyf)
+                reverted.add(name)
+                continue
             moved.add(name)
         if first is None:
             first = rendered
@@ -500,6 +588,7 @@ def normalise_stroke_weight(font, glyf):
     def spread(values):
         return statistics.pstdev(values) / statistics.median(values)
     print(f"2b. stroke weight: {len(moved)} masters offset to a {PEN_TARGET}-unit pen"
+          f" ({len(reverted - moved)} put back)"
           f"   ({min(first):.0f}..{max(first):.0f} -> {min(last):.0f}..{max(last):.0f},"
           f" spread {spread(first):.3f} -> {spread(last):.3f})")
 
