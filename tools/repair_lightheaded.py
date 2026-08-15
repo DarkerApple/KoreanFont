@@ -121,8 +121,8 @@ PEN_TARGET = 75          # the font's own usage-weighted median
 PEN_FLATTEN_STEPS = 6      # curve subdivision when measuring
 PEN_SCANLINES = 80
 PEN_MIN_COUNTER = 22       # white left between two strokes of the same jamo
-PEN_MAX_CHANGE = 0.28      # never move a stroke more than this much of its pen
-PEN_PASSES = 2             # offsetting changes the measurement, so measure again
+PEN_MAX_CHANGE = 0.40      # safe to be bold: every offset is checked and reverted
+PEN_PASSES = 3             # offsetting changes the measurement, so measure again
 PEN_KEEP_ONLY_IF_BETTER = True   # see below: thinning can delete a thin feature
 
 # --- gaps between the jamo of a syllable -----------------------------------
@@ -154,14 +154,23 @@ FINAL_BOTTOM = -50       # a final may drop this far below the baseline
 FINAL_GAP = 22           # white kept between the final and the vowel above it
 FINAL_MAX_GROWTH = 1.18
 
+# A Hangul font composes each syllable from positional variants of the jamo,
+# and this one does that cleanly: every (lead, vowel, has-tail) cell resolves to
+# exactly one drawn stroke.  What is not clean is the *scaling* — each consonant
+# ends up at 70-90 distinct rendered sizes because its transform is tuned per
+# vowel.  The width variation is functional (a narrow vowel leaves the lead more
+# room), but the height variation is not: it is why one ㅎ looks bigger than the
+# next.  Level the height inside each cell and leave the width alone.
+LEAD_CELL_MAX_CHANGE = 0.12
+
 # ㅗ and ㅛ syllables with a final consonant reach 14-16 units higher than every
 # other syllable, so the top line of a line of text is not level.
 TOPLINE_TOLERANCE = 8
 TOPLINE_MAX_DROP = 18
 TOPLINE_MIN_GAP = 34       # white to leave under the stroke we are lowering
 
-VERSION = "Version 2.300"
-FONT_REVISION = 2.3
+VERSION = "Version 2.400"
+FONT_REVISION = 2.4
 
 
 def main(src, dst):
@@ -195,6 +204,7 @@ def main(src, dst):
 
     repair_vertical_vowel_syllables(font, glyf, bounds)
     normalise_ieung(font, glyf, hmtx, component_box)
+    level_lead_heights(font, glyf, component_box)
     deepen_finals(font, glyf, component_box)
     normalise_stroke_weight(font, glyf)
     even_out_jamo_gaps(font, glyf, component_box)
@@ -369,6 +379,56 @@ def normalise_ieung(font, glyf, hmtx, component_box):
 
 
 
+
+
+# ------------------------------------------------ 2a. level the lead heights
+LEAD_GROUPS = {**{v: "vertical" for v in "ㅏㅐㅑㅒㅓㅔㅕㅖㅣ"},
+               **{v: "ㅗㅛ" for v in "ㅗㅛ"}, **{v: "ㅜㅠ" for v in "ㅜㅠ"},
+               "ㅡ": "ㅡ", **{v: "compound" for v in "ㅘㅙㅚㅝㅞㅟㅢ"}}
+
+
+def level_lead_heights(font, glyf, component_box):
+    cmap = font.getBestCmap()
+    vowels = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+
+    cells = {}
+    for cp in range(SYLLABLE_BASE, SYLLABLE_END):
+        lead, vowel, tail = decompose(cp)
+        if lead == IEUNG_LEAD:
+            continue                       # already one shape at one size
+        key = (lead, LEAD_GROUPS[vowels[vowel]], bool(tail))
+        box = component_box(glyf[cmap[cp]].components[0])
+        cells.setdefault(key, []).append((box[3] - box[1], box[3]))
+
+    target = {k: (statistics.median(h for h, _ in v), statistics.median(t for _, t in v))
+              for k, v in cells.items()}
+
+    changed, before, after = 0, [], []
+    for cp in range(SYLLABLE_BASE, SYLLABLE_END):
+        lead, vowel, tail = decompose(cp)
+        if lead == IEUNG_LEAD:
+            continue
+        want_h, want_top = target[(lead, LEAD_GROUPS[vowels[vowel]], bool(tail))]
+        comp = glyf[cmap[cp]].components[0]
+        box = component_box(comp)
+        height = box[3] - box[1]
+        before.append(height)
+        factor = max(1 - LEAD_CELL_MAX_CHANGE,
+                     min(1 + LEAD_CELL_MAX_CHANGE, want_h / height))
+        top = box[3] + max(-20.0, min(20.0, want_top - box[3]))
+        if abs(factor - 1) > 0.005 or abs(top - box[3]) >= 1:
+            sub = glyf[comp.glyphName]
+            sub.recalcBounds(glyf)
+            scale = comp.transform[1][1] * factor
+            comp.transform = [[comp.transform[0][0], comp.transform[0][1]],
+                              [comp.transform[1][0], scale]]
+            comp.y = round(top - height * factor - sub.yMin * scale)
+            changed += 1
+        after.append(height * factor)
+
+    spread = lambda v: statistics.pstdev(v) / statistics.median(v)
+    print(f"2a. lead heights: {changed} levelled inside their cell   "
+          f"spread {spread(before):.3f} -> {spread(after):.3f}")
 
 # ------------------------------------------------- 2b0. give finals more room
 def deepen_finals(font, glyf, component_box):
