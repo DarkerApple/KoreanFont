@@ -121,7 +121,7 @@
     <div class="mast-top">
       <div class="seal">修</div>
       <h1>Lightheaded Regular<span class="en">REPAIR SPECIMEN · BEFORE / AFTER</span></h1>
-      <span class="kicker">v2.400</span>
+      <span class="kicker">v2.700</span>
     </div>
     <p class="lead">
       원본 폰트의 결함 열한 가지를 고쳤습니다. 각 항목은 같은 문장을 수리 전 <code>before</code> /
@@ -335,11 +335,19 @@
   </p>
 
   <table class="tbl">
-    <tr><th>획 굵기(실제 렌더링)</th><th>중앙값</th><th>편차(σ)</th><th>σ/중앙값</th><th>5~95백분위</th></tr>
-    <tr><td>수리 전</td><td class="num">74.6</td><td class="num">10.1</td><td class="drop">0.135</td><td class="num">56 – 90</td></tr>
-    <tr><td>수리 후</td><td class="num">74.9</td><td class="num">8.7</td><td class="good">0.116</td><td class="good">58 – 88</td></tr>
+    <tr><th>획 굵기(실제 렌더링, 36,841회)</th><th>중앙값</th><th>σ/중앙값</th><th>5~95백분위</th><th>10% 이상 벗어남</th></tr>
+    <tr><td>수리 전</td><td class="num">74.1</td><td class="drop">0.083</td><td class="num">58 – 77</td><td class="drop">17.7%</td></tr>
+    <tr><td>v2.600</td><td class="num">74.9</td><td class="num">0.047</td><td class="num">67 – 77</td><td class="num">5.3%</td></tr>
+    <tr><td>v2.700</td><td class="num">75.0</td><td class="good">0.030</td><td class="good">73 – 77</td><td class="good">0.8%</td></tr>
   </table>
-  <p class="note">폰트 전체 색(중앙값 74.6 → 74.9)은 그대로 두고 편차만 줄였습니다.</p>
+  <p class="note">
+    폰트 전체 색(중앙값)은 그대로 두고 편차만 줄였습니다. 초성 19자 전부가 이제 72~75에
+    들어옵니다 — 수리 전에는 ㅃ 60, ㅍ 61, ㅉ 64에서 ㄷ 75까지 벌어져 있었습니다.
+    v2.700에서 고친 건 굵히기의 <b>방향</b>입니다: 바깥 윤곽선과 속공간은 감기는 방향이
+    반대인데 각자의 감김만 보고 밀다 보니 둘 다 바깥으로 움직여, ㅁ을 굵히면 글자와 속이
+    같이 커지고 획은 그대로였습니다. 속공간이 있는 원본 302개 중 297개가 그랬습니다.
+    ㅇ은 고리라 주사선으로 잴 수 없어서 상하좌우 끝점에서 따로 재고, 안쪽으로만 굵힙니다.
+  </p>
 
   <!-- ================================================== 9. 자모 간격 -->
   <div class="sec-h" id="s9">
@@ -445,7 +453,7 @@
     안녕하세요. 왕용영정성징 · 강공광 · 오우으이안온옹앙 · The quick brown fox 0123456789.</div></div>
 
   <footer>
-    LIGHTHEADED REGULAR v2.400 · repaired with <code>tools/repair_lightheaded.py</code> ·
+    LIGHTHEADED REGULAR v2.700 · repaired with <code>tools/repair_lightheaded.py</code> ·
     references measured from 17 Korean fonts (Google Fonts) ·
     <a href="index.html" style="color:inherit">← 작도 그리드로 돌아가기</a>
   </footer>

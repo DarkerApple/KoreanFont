@@ -115,14 +115,24 @@ CURRENCY = {0x20A9: "won", 0x20AC: "Euro", 0x00A5: "yen"}
 # Every stroke master is drawn at its own size and then scaled to fit, so the
 # pen that reaches the page ranges from 48 to 112 units depending on which
 # stroke you are looking at.  Each master is offset along its own normals until
-# it renders at one weight.  68 is the font's own median, so most masters barely
-# move (median correction: 9% of the master's pen).
+# it renders at one weight.  75 is the font's own usage-weighted median, so the
+# colour of the page does not change -- only its evenness does: measured over all
+# 36,841 component uses, sigma/median falls from 0.083 to 0.030 and the strokes
+# more than a tenth off target from 17.7% to 0.8%.
 PEN_TARGET = 75          # the font's own usage-weighted median
 PEN_FLATTEN_STEPS = 6      # curve subdivision when measuring
 PEN_SCANLINES = 80
 PEN_MIN_COUNTER = 22       # white left between two strokes of the same jamo
+PEN_SLIVER = 0.35          # white narrower than this much of the pen is a
+                           # junction artefact, not a counter
 PEN_MAX_CHANGE = 0.40      # safe to be bold: every offset is checked and reverted
 PEN_PASSES = 3             # offsetting changes the measurement, so measure again
+# A stroke reaches the page at pen_of_the_master x the scale the composite uses
+# it at, so normalising a master only fixes the *median* scale it serves.  The
+# ieung is the extreme case: one stroke, 987 uses, rendering anywhere from 64 to
+# 90.  Split a master into copies whenever its uses want different weights, then
+# normalise each copy on its own.  Costs 152 extra glyphs.
+PEN_SCALE_TOLERANCE = 0.03
 PEN_KEEP_ONLY_IF_BETTER = True   # see below: thinning can delete a thin feature
 
 # --- gaps between the jamo of a syllable -----------------------------------
@@ -169,8 +179,8 @@ TOPLINE_TOLERANCE = 8
 TOPLINE_MAX_DROP = 18
 TOPLINE_MIN_GAP = 34       # white to leave under the stroke we are lowering
 
-VERSION = "Version 2.400"
-FONT_REVISION = 2.4
+VERSION = "Version 2.700"
+FONT_REVISION = 2.7
 
 
 def main(src, dst):
@@ -206,7 +216,7 @@ def main(src, dst):
     normalise_ieung(font, glyf, hmtx, component_box)
     level_lead_heights(font, glyf, component_box)
     deepen_finals(font, glyf, component_box)
-    normalise_stroke_weight(font, glyf)
+    normalise_stroke_weight(font, glyf, hmtx)
     even_out_jamo_gaps(font, glyf, component_box)
     separate_compound_vowels(font, glyf, component_box)
     level_top_line(font, glyf, component_box)
@@ -467,6 +477,50 @@ def deepen_finals(font, glyf, component_box):
     print(f"2b0. finals: {grown} deepened   median height "
           f"{statistics.median(before):.0f} -> {statistics.median(after):.0f}")
 
+
+def split_masters_by_scale(font, glyf, hmtx):
+    """One stroke used at two sizes cannot render at one weight.  Give each
+    band of scales its own copy of the stroke."""
+    uses = {}
+    for name in font.getGlyphOrder():
+        glyph = glyf[name]
+        if glyph.numberOfContours != -1:
+            continue
+        for comp in glyph.components:
+            scale = (comp.transform[0][0] + comp.transform[1][1]) / 2
+            uses.setdefault(comp.glyphName, []).append((scale, comp))
+
+    order = list(font.getGlyphOrder())
+    added = 0
+    for name, entries in uses.items():
+        glyph = glyf[name]
+        if glyph.numberOfContours <= 0 or len(entries) < 2:
+            continue
+        entries.sort(key=lambda e: e[0])
+        bands, current = [], [entries[0]]
+        for entry in entries[1:]:
+            if entry[0] / current[0][0] - 1 <= 2 * PEN_SCALE_TOLERANCE:
+                current.append(entry)
+            else:
+                bands.append(current)
+                current = [entry]
+        bands.append(current)
+        for i, band in enumerate(bands[1:], start=1):
+            copy_name = f"{name}.s{i}"
+            glyf[copy_name] = copy.deepcopy(glyph)
+            hmtx.metrics[copy_name] = hmtx[name]
+            order.append(copy_name)
+            added += 1
+            for _, comp in band:
+                comp.glyphName = copy_name
+
+    order = list(dict.fromkeys(order))
+    font.setGlyphOrder(order)
+    glyf.glyphOrder = order
+    glyf.glyphs = {n: glyf.glyphs[n] for n in order}
+    font["maxp"].numGlyphs = len(order)
+    print(f"2b1. stroke copies: {added} added so each scale band can carry its own weight")
+
 # ------------------------------------------------------- 2b. stroke weight
 def _flatten(pen_value, steps):
     """Recorded pen output -> polygons, so we can take scanline measurements."""
@@ -546,14 +600,47 @@ def measure_pen(glyph_set, name):
                   + _ink_runs(polys, 1, PEN_SCANLINES, white))
     if len(runs) < 8:
         return None, None
-    white.sort()
-    gap = white[len(white) // 20] if len(white) >= 20 else (white[0] if white else None)
     # a low percentile finds the thinnest stroke; take the median of everything
     # near it so a ㅌ is judged by its bars, not by its one thin stem, and a long
     # stem still contributes its width rather than its length
     thin = runs[len(runs) // 5]
     band = [r for r in runs if 0.5 * thin <= r <= 2.5 * thin]
-    return statistics.median(band), gap
+    pen = statistics.median(band)
+    # Where two strokes meet they leave a hairline sliver of white that is not a
+    # counter.  Reading the sliver as one is what refused nearly every
+    # thickening in the font: ㅍ's real openings are 440 units across, but its
+    # junction slivers measure 15, so the guard clamped it to zero.
+    real = sorted(w for w in white if w > PEN_SLIVER * pen)
+    gap = real[len(real) // 10] if len(real) >= 10 else (real[0] if real else None)
+    return pen, gap
+
+
+def measure_ring(glyph_set, name):
+    """The ieung's stroke, measured straight across the four extremes.
+
+    A scanline cannot read a ring: near the top of the ellipse a horizontal cut
+    runs the length of the cap rather than across the stroke, and those long
+    runs drag the median up by a ninth.  Believing them would thin the most
+    common stroke in Hangul.  At the extremes the outline is perpendicular to
+    the axis, so a straight subtraction of the two boxes is exact."""
+    from fontTools.pens.recordingPen import RecordingPen
+    recorder = RecordingPen()
+    glyph_set[name].draw(recorder)
+    polys = _flatten(recorder.value, PEN_FLATTEN_STEPS)
+    if len(polys) < 2:
+        return None, None
+    boxes = []
+    for poly in polys:
+        xs = [p[0] for p in poly]
+        ys = [p[1] for p in poly]
+        boxes.append((min(xs), max(xs), min(ys), max(ys)))
+    boxes.sort(key=lambda b: (b[1] - b[0]) * (b[3] - b[2]))
+    inner, outer = boxes[0], boxes[-1]
+    thickness = [inner[0] - outer[0], outer[1] - inner[1],
+                 inner[2] - outer[2], outer[3] - inner[3]]
+    if min(thickness) <= 0:
+        return None, None
+    return statistics.mean(thickness), min(inner[1] - inner[0], inner[3] - inner[2])
 
 
 def _signed_area(ring):
@@ -565,19 +652,69 @@ def _signed_area(ring):
     return total / 2
 
 
-def offset_outline(glyph, delta):
+def _contains(ring, point):
+    """Crossing number: is `point` inside `ring`?"""
+    x, y = point
+    inside = False
+    for i in range(len(ring)):
+        x0, y0 = ring[i]
+        x1, y1 = ring[(i + 1) % len(ring)]
+        if (y0 > y) != (y1 > y) and x < x0 + (y - y0) / (y1 - y0) * (x1 - x0):
+            inside = not inside
+    return inside
+
+
+def offset_outline(glyph, delta, holes_only=False):
     """Push every point away from the ink by `delta`, thickening the stroke.
-    Winding decides which way is out, so counters close as the stroke grows."""
+
+    `holes_only` closes the counter by `2 * delta` and leaves the silhouette
+    alone -- the ieung needs that, because all 987 of them were already placed
+    against the master's outer box and growing it would move every one of them.
+
+    Which way is out is a property of where a contour sits, not of how it winds.
+    Rotating each contour's tangent by its own winding sent an outline outward
+    and the hole inside it outward too: thickening a ㅁ grew its box and grew
+    its counter by the same amount and left the stroke exactly as thin as it
+    started.  297 of the 302 masters with a counter were being offset that way,
+    which is why ㅁ ㅃ ㅍ ㅎ kept getting measured, moved, measured again and put
+    back.  Winding is not reliable enough to fix it either -- 17 masters wind
+    two ink blobs opposite ways -- so decide by nesting: a contour with an even
+    number of contours around it is an outline and grows, one with an odd number
+    is a hole and shrinks."""
     coords, end_points, _ = glyph.getCoordinates(None)
     points = list(coords)
-    start = 0
+    contours, start = [], 0
     for end in end_points:
-        index = list(range(start, end + 1))
+        contours.append(list(range(start, end + 1)))
         start = end + 1
-        ring = [points[i] for i in index]
+
+    rings = [[points[i] for i in c] for c in contours]
+    depth = []
+    for k, ring in enumerate(rings):
+        if len(ring) < 3:
+            depth.append(0)
+            continue
+        # a point on this contour, which is inside another one exactly when the
+        # whole contour is -- outlines never cross.  Take the middle of the
+        # longest edge so the test never lands on another contour's vertex.
+        edge = max(range(len(ring)),
+                   key=lambda i: math.hypot(ring[(i + 1) % len(ring)][0] - ring[i][0],
+                                            ring[(i + 1) % len(ring)][1] - ring[i][1]))
+        head, tail = ring[edge], ring[(edge + 1) % len(ring)]
+        probe = ((head[0] + tail[0]) / 2, (head[1] + tail[1]) / 2)
+        depth.append(sum(1 for j, other in enumerate(rings)
+                         if j != k and len(other) >= 3 and _contains(other, probe)))
+
+    for c, index in enumerate(contours):
+        ring = rings[c]
         if len(ring) < 3:
             continue
-        direction = 1.0 if _signed_area(ring) < 0 else -1.0
+        hole = depth[c] % 2 == 1
+        if holes_only and not hole:
+            continue
+        # outward from this contour, then flipped again if it is a hole
+        direction = (-1.0 if _signed_area(ring) > 0 else 1.0) * (-1.0 if hole else 1.0)
+        step = 2 * delta if holes_only else delta
         n = len(ring)
         for k, i in enumerate(index):
             before, after = ring[(k - 1) % n], ring[(k + 1) % n]
@@ -585,12 +722,13 @@ def offset_outline(glyph, delta):
             length = math.hypot(tx, ty)
             if length < 1e-6:
                 continue
-            points[i] = (points[i][0] - ty / length * direction * delta,
-                         points[i][1] + tx / length * direction * delta)
+            points[i] = (points[i][0] - ty / length * direction * step,
+                         points[i][1] + tx / length * direction * step)
     glyph.coordinates = type(coords)([(round(x), round(y)) for x, y in points])
 
 
-def normalise_stroke_weight(font, glyf):
+def normalise_stroke_weight(font, glyf, hmtx):
+    split_masters_by_scale(font, glyf, hmtx)
     glyph_set = font.getGlyphSet()
 
     # what scale does each master actually reach the page at?
@@ -610,7 +748,9 @@ def normalise_stroke_weight(font, glyf):
             glyph = glyf[name]
             if glyph.numberOfContours <= 0:
                 continue
-            pen, counter = measure_pen(glyph_set, name)
+            ring = name.startswith(IEUNG_MASTER)
+            measure = measure_ring if ring else measure_pen
+            pen, counter = measure(glyph_set, name)
             if not pen:
                 continue
             scale = statistics.median(used)
@@ -630,9 +770,9 @@ def normalise_stroke_weight(font, glyf):
             # out as a pair of horns.  So do it, measure again, and put the
             # glyph back if it did not actually get closer to the target.
             before_coords = glyph.coordinates.copy()
-            offset_outline(glyph, delta)
+            offset_outline(glyph, delta, holes_only=ring)
             glyph.recalcBounds(glyf)
-            checked, _ = measure_pen(glyph_set, name)
+            checked, _ = measure(glyph_set, name)
             if checked is None or (PEN_KEEP_ONLY_IF_BETTER and
                                    abs(checked * scale - PEN_TARGET) >=
                                    abs(pen * scale - PEN_TARGET)):
