@@ -121,7 +121,7 @@
     <div class="mast-top">
       <div class="seal">修</div>
       <h1>Lightheaded Regular<span class="en">REPAIR SPECIMEN · BEFORE / AFTER</span></h1>
-      <span class="kicker">v2.700</span>
+      <span class="kicker">v2.800</span>
     </div>
     <p class="lead">
       원본 폰트의 결함 열한 가지를 고쳤습니다. 각 항목은 같은 문장을 수리 전 <code>before</code> /
@@ -140,6 +140,7 @@
       <a href="#s9">9 · 자모 사이 간격</a>
       <a href="#s10">10 · 겹모음 충돌</a>
       <a href="#s11">11 · ㅇ 높이 · 받침 깊이</a>
+      <a href="#s12">12 · ㄷ·ㅌ의 굽이</a>
     </nav>
   </header>
 
@@ -442,6 +443,48 @@
     <tr><td>수리 후</td><td class="num">74.6</td><td class="good">6.2</td><td class="num">ㅍ 60 · ㅃ 60</td><td class="good">ㅇ 77 · ㄴ 75</td></tr>
   </table>
 
+  <!-- ================================================== 12. ㄷ·ㅌ의 굽이 -->
+  <div class="sec-h" id="s12">
+    <h2>12 · ㄷ·ㅌ의 굽이</h2>
+    <span class="meta">2,562 SYLLABLES</span>
+    <span class="desc">모서리가 없어 드가 ⊂로, 트가 ∈로 읽혔습니다</span>
+  </div>
+
+  <div class="row before"><div class="tag">Before</div><div class="spec s-lg">ㄷ ㅌ 드 트 다 타 굳 같</div></div>
+  <div class="row after"><div class="tag">After</div><div class="spec s-lg">ㄷ ㅌ 드 트 다 타 굳 같</div></div>
+  <div class="row ref"><div class="tag">Gowun</div><div class="spec s-lg">ㄷ ㅌ 드 트 다 타 굳 같</div></div>
+
+  <div class="row before"><div class="tag">Before</div><div class="spec s-md">대한민국 트로트 · 굳게 닫힌 문 앞에서</div></div>
+  <div class="row after"><div class="tag">After</div><div class="spec s-md">대한민국 트로트 · 굳게 닫힌 문 앞에서</div></div>
+  <div class="row ref"><div class="tag">Gowun</div><div class="spec s-md">대한민국 트로트 · 굳게 닫힌 문 앞에서</div></div>
+
+  <p class="note">
+    ㄷ과 ㅌ이 <b>반원 하나로</b> 그려져 있었습니다. 모서리가 아예 없어서 드는 ⊂로, 트는
+    ∈로 읽혔습니다. 비교한 한글 폰트 17종은 <b>전부</b> 모서리를 꺾습니다 — 평평한 가로획,
+    각진 모서리, 곧은 세로획.
+  </p>
+  <p class="note">
+    <b>획 자체는 문제가 없고, 획이 지나가는 길이 둥근 것</b>이라 다시 그리지 않았습니다.
+    ㄷ은 "가로획 → 굽이 → 세로획 → 굽이 → 가로획"이고, 이 폰트의 ㄷ과 다른 폰트의 ㄷ을
+    가르는 건 <b>굽이의 반지름 하나뿐</b>입니다. 그래서 두 경로를 계산으로 적어두고 —
+    옛 경로는 반지름 최대(= 반원, 지금 이 폰트), 새 경로는 0.30 — 글자의 모든 점을
+    <b>펜이 움직이는 좌표계</b>로 옮겨 적습니다. 획을 사이에 둔 두 점은 같은 좌표계를
+    공유하므로 <b>획 굵기·획 끝 모양·손의 떨림이 그대로 남고</b>, 바뀌는 건 펜이 걸어가는
+    선뿐입니다. 두 경로가 같은 상자를 쓰기 때문에 가로획과 세로획 구간의 점은
+    <b>하나도 움직이지 않고</b>, 변화는 두 굽이에만 생깁니다.
+  </p>
+  <table class="tbl">
+    <tr><th></th><th>획 원본</th><th>영향 음절</th><th>굽이 반지름</th><th>획 굵기 편차</th></tr>
+    <tr><td>수리 전</td><td class="num">35</td><td class="num">2,562</td><td class="drop">1.00 (반원)</td><td class="num">0.030</td></tr>
+    <tr><td>수리 후</td><td class="num">35</td><td class="num">2,562</td><td class="good">0.30</td><td class="good">0.030</td></tr>
+  </table>
+  <p class="note">
+    굵기를 맞추는 단계보다 <b>먼저</b> 돌기 때문에 새 모양 위에서 굵기가 다시 측정됩니다 —
+    ㄷ 75.1, ㅌ 74.9, ㄸ 75.2로 목표(75)에 그대로 있습니다. 다만 ㄸ 원본 몇 개는 두 ㄷ이
+    서로 파고들도록 <b>배치</b>돼 있어 뜨·딸은 여전히 붙어 보입니다. 그건 굽이가 아니라
+    배치의 문제라 손대지 않았습니다.
+  </p>
+
   <!-- ================================================== 본문 -->
   <div class="sec-h">
     <h2>본문 견본</h2>
@@ -453,7 +496,7 @@
     안녕하세요. 왕용영정성징 · 강공광 · 오우으이안온옹앙 · The quick brown fox 0123456789.</div></div>
 
   <footer>
-    LIGHTHEADED REGULAR v2.700 · repaired with <code>tools/repair_lightheaded.py</code> ·
+    LIGHTHEADED REGULAR v2.800 · repaired with <code>tools/repair_lightheaded.py</code> ·
     references measured from 17 Korean fonts (Google Fonts) ·
     <a href="index.html" style="color:inherit">← 작도 그리드로 돌아가기</a>
   </footer>

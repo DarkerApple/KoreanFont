@@ -64,6 +64,21 @@ IEUNG_LEAD, IEUNG_TAIL = 11, 21
 # healthy syllables bottom out around -20
 BROKEN_BELOW = -60
 
+# --- the bend of ㄷ ㅌ ㄸ ----------------------------------------------------
+# ㄷ and ㅌ are drawn in this font as half circles: 드 reads as ⊂ and 트 as ∈.
+# Every Korean face measured for the panel turns a corner instead -- Gowun
+# Dodum, Gaegu, 감자꽃, 푸어스토리, 싱글데이 all draw a flat arm, a square bend
+# and a straight stem.  0 is a right angle and 1.0 is the half circle the font
+# has now; 0.30 keeps enough round for the hand to still show.
+BEND_CORNER = 0.30
+BEND_FALLOFF = 0.95      # how far a point feels the path, in pen widths
+BEND_SAMPLES = 260       # points the path is measured at
+BEND_COLUMNS = 140       # columns used to find the two stems of a joined ㄸ
+DT_LEADS = {3, 4, 16}    # ㄷ ㄸ ㅌ
+DOUBLE_D_LEAD = 4        # ㄸ
+DT_TAILS = {7, 25}       # ㄷ ㅌ
+DT_COMPAT = {0x3137: 1, 0x3138: 2, 0x314C: 1}   # the letters ㄷ ㄸ ㅌ on their own
+
 # --- ieung -----------------------------------------------------------------
 # glyph00277 is the roundest of the nine hand-drawn ieung masters (1120x1002,
 # ar 1.12).  Its ring is thin for the size we now draw it at, so the inner
@@ -179,8 +194,8 @@ TOPLINE_TOLERANCE = 8
 TOPLINE_MAX_DROP = 18
 TOPLINE_MIN_GAP = 34       # white to leave under the stroke we are lowering
 
-VERSION = "Version 2.700"
-FONT_REVISION = 2.7
+VERSION = "Version 2.800"
+FONT_REVISION = 2.8
 
 
 def main(src, dst):
@@ -213,6 +228,7 @@ def main(src, dst):
         return (x0, y0, x0 + (sub.xMax - sub.xMin) * sx, y0 + (sub.yMax - sub.yMin) * sy)
 
     repair_vertical_vowel_syllables(font, glyf, bounds)
+    angle_the_bends(font, glyf)
     normalise_ieung(font, glyf, hmtx, component_box)
     level_lead_heights(font, glyf, component_box)
     deepen_finals(font, glyf, component_box)
@@ -269,6 +285,235 @@ def repair_vertical_vowel_syllables(font, glyf, bounds):
     print(f"1. repaired {len(repaired)} ㅗ/ㅛ syllables")
     for ch, before, after in repaired:
         print(f"     {ch}  y {before[1]:5}..{before[3]:4}  ->  {after[1]:5}..{after[3]:4}")
+
+
+# --------------------------------------------------- 1b. the bend of ㄷ ㅌ ㄸ
+def _dt_masters(font, glyf):
+    """Which stroke masters draw a ㄷ, a ㅌ or a ㄸ, and how many bowls each has."""
+    cmap = font.getBestCmap()
+    found = {}
+    for cp in range(SYLLABLE_BASE, SYLLABLE_END):
+        lead, _, tail = decompose(cp)
+        parts = glyf[cmap[cp]].components
+        if lead in DT_LEADS:
+            found[parts[0].glyphName] = 2 if lead == DOUBLE_D_LEAD else 1
+        if tail in DT_TAILS:
+            found[parts[-1].glyphName] = 1
+    # the standalone letters ㄷ ㄸ ㅌ are drawn from masters of their own, and
+    # they are what the reader sees in a keyboard or a spelling table
+    for cp, bowls in DT_COMPAT.items():
+        name = cmap.get(cp)
+        if name and glyf[name].isComposite():
+            for comp in glyf[name].components:
+                found[comp.glyphName] = bowls
+    return found
+
+
+def _outline_polygons(glyph_set, name):
+    from fontTools.pens.recordingPen import RecordingPen
+    recorder = RecordingPen()
+    glyph_set[name].draw(recorder)
+    return _flatten(recorder.value, 10)
+
+
+def _pen_of(polys):
+    """Median stroke width, read by shooting a ray across the ribbon from every
+    point of its outline."""
+    widths = []
+    for poly in polys:
+        n = len(poly)
+        area = _signed_area(poly)
+        side = 1.0 if area > 0 else -1.0
+        for i in range(0, n, max(1, n // 150)):
+            a, b = poly[(i - 1) % n], poly[(i + 1) % n]
+            tx, ty = b[0] - a[0], b[1] - a[1]
+            length = math.hypot(tx, ty)
+            if length < 1e-9:
+                continue
+            nx, ny = -ty / length * side, tx / length * side
+            hit = _first_crossing(polys, poly[i], (nx, ny))
+            if hit:
+                widths.append(hit)
+    return statistics.median(widths) if widths else None
+
+
+def _first_crossing(polys, origin, direction, tmin=1e-6):
+    best = None
+    for poly in polys:
+        for i in range(len(poly)):
+            a, b = poly[i], poly[(i + 1) % len(poly)]
+            ex, ey = b[0] - a[0], b[1] - a[1]
+            den = direction[0] * ey - direction[1] * ex
+            if abs(den) < 1e-12:
+                continue
+            wx, wy = a[0] - origin[0], a[1] - origin[1]
+            t = (wx * ey - wy * ex) / den
+            u = (direction[0] * wy - direction[1] * wx) / (-den)
+            if t > tmin and -1e-9 <= u <= 1 + 1e-9 and (best is None or t < best):
+                best = t
+    return best
+
+
+def _bend_path(box, corner, samples=BEND_SAMPLES):
+    """The path a pen walks to draw a ㄷ over `box`: arm, bend, stem, bend, arm.
+    `corner` is the bend's radius as a fraction of the largest one that fits --
+    at 1.0 the two bends meet and the ㄷ is a half circle, which is how this
+    font draws it today."""
+    x_left, x_right, y_bot, y_top = box
+    k = corner * min((y_top - y_bot) / 2, x_right - x_left)
+    cx = x_left + k
+
+    def arc(centre, start, end, steps=40):
+        return [(centre[0] + k * math.cos(start + (end - start) * i / steps),
+                 centre[1] + k * math.sin(start + (end - start) * i / steps))
+                for i in range(steps + 1)]
+
+    corners = [(x_right, y_top), (cx, y_top)]
+    corners += arc((cx, y_top - k), math.pi / 2, math.pi)
+    corners += [(x_left, y_bot + k)]
+    corners += arc((cx, y_bot + k), math.pi, 3 * math.pi / 2)
+    corners += [(cx, y_bot), (x_right, y_bot)]
+
+    step = [math.dist(corners[i], corners[i + 1]) for i in range(len(corners) - 1)]
+    total = sum(step)
+    path, index, walked = [], 0, 0.0
+    for j in range(samples):
+        target = total * j / (samples - 1)
+        while index < len(step) - 1 and walked + step[index] < target:
+            walked += step[index]
+            index += 1
+        u = (target - walked) / step[index] if step[index] else 0.0
+        a, b = corners[index], corners[index + 1]
+        path.append((a[0] + u * (b[0] - a[0]), a[1] + u * (b[1] - a[1])))
+    return path
+
+
+def _bowl_boxes(polys, pen, bowls):
+    """The box each bowl's pen path travels round."""
+    xs = [p[0] for q in polys for p in q]
+    ys = [p[1] for q in polys for p in q]
+    whole = (min(xs) + pen / 2, max(xs) - pen / 2, min(ys) + pen / 2, max(ys) - pen / 2)
+    if bowls == 1:
+        return [whole]
+    if len(polys) >= 2:                       # ㄸ drawn as two separate outlines
+        boxes = []
+        for q in sorted(polys, key=lambda q: min(p[0] for p in q))[:2]:
+            qx = [p[0] for p in q]
+            qy = [p[1] for p in q]
+            boxes.append((min(qx) + pen / 2, max(qx) - pen / 2,
+                          min(qy) + pen / 2, max(qy) - pen / 2))
+        return boxes
+    # ㄸ drawn as one outline, the two bowls touching.  A stem is a column that
+    # is ink nearly all the way down, and a ㄸ has two of them; the gap between
+    # them is how far the second bowl sits from the first.
+    height = max(ys) - min(ys)
+    span = max(xs) - min(xs)
+    solid = []
+    for i in range(BEND_COLUMNS):
+        x = min(xs) + span * (i + 0.5) / BEND_COLUMNS
+        cuts = []
+        for q in polys:
+            for j in range(len(q)):
+                a, b = q[j], q[(j + 1) % len(q)]
+                if (a[0] <= x < b[0]) or (b[0] <= x < a[0]):
+                    t = (x - a[0]) / (b[0] - a[0])
+                    cuts.append(a[1] + t * (b[1] - a[1]))
+        cuts.sort()
+        ink = sum(cuts[k + 1] - cuts[k] for k in range(0, len(cuts) - 1, 2))
+        if ink > 0.55 * height:
+            solid.append(x)
+    groups = []
+    for x in solid:
+        if groups and x - groups[-1][-1] < span * 0.12:
+            groups[-1].append(x)
+        else:
+            groups.append([x])
+    if len(groups) < 2:
+        return [whole]
+    groups.sort(key=len, reverse=True)
+    stems = sorted(sum(g) / len(g) for g in groups[:2])
+    shift = stems[1] - stems[0]
+    first = (whole[0], whole[1] - shift, whole[2], whole[3])
+    return [first, (first[0] + shift, first[1] + shift, first[2], first[3])]
+
+
+def _transport(points, pairs, falloff):
+    """Rewrite every point in the pen's moving frame -- how far along the path it
+    sits and how far off to the side -- and rebuild it at the same place on the
+    new path.  Two points on opposite edges of a stroke share a frame, so the
+    stroke keeps its width, its edge texture and its terminals exactly; only the
+    line the pen walks changes.  Points that are on no path at all, like ㅌ's
+    middle bar, are carried by whichever stretch of path runs nearest, so they
+    travel with the stem instead of being left behind."""
+    frames = []
+    for old, new in pairs:
+        for path, out in ((old, []), (new, [])):
+            for i in range(len(path)):
+                a = path[max(0, i - 1)]
+                b = path[min(len(path) - 1, i + 1)]
+                tx, ty = b[0] - a[0], b[1] - a[1]
+                length = math.hypot(tx, ty) or 1.0
+                out.append((path[i], (tx / length, ty / length),
+                            (-ty / length, tx / length)))
+            frames.append(out)
+    old_frames = [f for i, f in enumerate(frames) if i % 2 == 0]
+    new_frames = [f for i, f in enumerate(frames) if i % 2 == 1]
+    old_flat = [f for run in old_frames for f in run]
+    new_flat = [f for run in new_frames for f in run]
+
+    spread = 2 * falloff * falloff
+    moved = []
+    for px, py in points:
+        sx = sy = weight = 0.0
+        for (c, t, n), (c2, t2, n2) in zip(old_flat, new_flat):
+            dx, dy = px - c[0], py - c[1]
+            d2 = dx * dx + dy * dy
+            w = math.exp(-d2 / spread) + 1e-12
+            alpha = dx * t[0] + dy * t[1]
+            beta = dx * n[0] + dy * n[1]
+            sx += w * (c2[0] + alpha * t2[0] + beta * n2[0])
+            sy += w * (c2[1] + alpha * t2[1] + beta * n2[1])
+            weight += w
+        moved.append((sx / weight, sy / weight))
+    return moved
+
+
+def angle_the_bends(font, glyf):
+    """ㄷ and ㅌ are drawn here as half circles -- a Latin C and a Latin € -- so
+    a 드 reads as ⊂ and a 트 as ∈.  Every other Korean face turns the corner:
+    a flat arm, a square bend, a straight stem.  The stroke itself is right, it
+    is the line it walks that is round, so nothing is redrawn -- each master is
+    carried from a full-radius bend onto a tight one in the pen's own frame,
+    which leaves the pen width, the terminals and the hand's wobble untouched."""
+    if BEND_CORNER >= 1.0:
+        return
+    glyph_set = font.getGlyphSet()
+    masters = _dt_masters(font, glyf)
+    done, moved_box = 0, 0
+    for name, bowls in sorted(masters.items()):
+        glyph = glyf[name]
+        if glyph.numberOfContours <= 0:
+            continue
+        polys = _outline_polygons(glyph_set, name)
+        if not polys:
+            continue
+        pen = _pen_of(polys)
+        if not pen:
+            continue
+        boxes = _bowl_boxes(polys, pen, bowls)
+        pairs = [(_bend_path(b, 1.0), _bend_path(b, BEND_CORNER)) for b in boxes]
+
+        before = (glyph.xMin, glyph.yMin, glyph.xMax, glyph.yMax)
+        coords, _, _ = glyph.getCoordinates(glyf)
+        fresh = _transport(list(coords), pairs, falloff=pen * BEND_FALLOFF)
+        glyph.coordinates = type(coords)([(round(x), round(y)) for x, y in fresh])
+        glyph.recalcBounds(glyf)
+        after = (glyph.xMin, glyph.yMin, glyph.xMax, glyph.yMax)
+        done += 1
+        moved_box = max(moved_box, max(abs(a - b) for a, b in zip(before, after)))
+
+    print(f"1b. ㄷ ㅌ ㄸ: {done} masters walked onto a squared bend"
+          f" (radius {BEND_CORNER:.2f} of the round one, box moved <= {moved_box:.0f})")
 
 
 # --------------------------------------------------------------- 2. the ieung
